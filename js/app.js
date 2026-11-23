@@ -25,6 +25,7 @@ const state = {
   clients: [],
   attendanceLogs: [],
   singleClasses: [],
+  payments:[],
   selectedDate: new Date(2026, 10, 16), // Default: Nov 16, 2026 (Monday)
   viewYear: 2026,
   viewMonth: 10,
@@ -55,17 +56,19 @@ async function initApp() {
 
 async function loadAllData() {
   try {
-    const [setRes, cliRes, logRes, sinRes] = await Promise.all([
+    const [setRes, cliRes, logRes, sinRes, payRes] = await Promise.all([
       sb.from('trainer_settings').select('*').eq('id', 1).single(),
       sb.from('clients').select('*').order('created_at', { ascending: true }),
       sb.from('attendance_logs').select('*'),
-      sb.from('single_classes').select('*')
+      sb.from('single_classes').select('*'),
+      sb.from('payments').select('*')
     ]);
 
     if (setRes.data) state.settings = { ...state.settings, ...setRes.data };
     if (cliRes.data) state.clients = cliRes.data;
     if (logRes.data) state.attendanceLogs = logRes.data;
     if (sinRes.data) state.singleClasses = sinRes.data;
+    if (payRes.data) state.payments = payRes.data;
   } catch (err) {
     console.warn('Supabase sync note (verify URL/Keys):', err.message);
   }
@@ -536,6 +539,53 @@ function setupClientInfoControls() {
 // ============================================================================
 // 8. FECHAMENTO & WHATSAPP RECEIPT IMAGE GENERATOR
 // ============================================================================
+
+//CLIENTE JÁ PAGOU OU NÃO...
+function getCurrentPeriodKey() {
+  if (state.fechamentoMode === 'mes') {
+    return `${state.fechamentoYear}-${String(state.fechamentoMonth + 1).padStart(2, '0')}`;
+  }
+  if (state.fechamentoMode === 'ano') {
+    return `${state.fechamentoYear}`;
+  }
+  const start = document.getElementById('fechamento-start-date').value || 'start';
+  const end = document.getElementById('fechamento-end-date').value || 'end';
+  return `range_${start}_${end}`;
+}
+
+async function toggleClientPayment(clientKey, periodKey, amount) {
+  const existingIdx = state.payments.findIndex(
+    p => p.client_key === clientKey && p.period_key === periodKey
+  );
+  const currentPaid = existingIdx >= 0 ? Boolean(state.payments[existingIdx].paid) : false;
+  const nextPaid = !currentPaid;
+
+  const record = {
+    client_key: clientKey,
+    period_key: periodKey,
+    amount: amount,
+    paid: nextPaid,
+    paid_at: nextPaid ? new Date().toISOString() : null
+  };
+
+  if (existingIdx >= 0) {
+    state.payments[existingIdx] = { ...state.payments[existingIdx], ...record };
+  } else {
+    state.payments.push(record);
+  }
+
+  renderFechamento();
+
+  const { error } = await sb
+    .from('payments')
+    .upsert(record, { onConflict: 'client_key,period_key' });
+
+  if (error) {
+    console.error('Erro ao salvar pagamento no Supabase:', error.message);
+  }
+}
+
+
 function setupFechamentoControls() {
   const monthCol = document.getElementById('fechamento-month-col');
   const yearCol = document.getElementById('fechamento-year-col');
@@ -575,7 +625,8 @@ function setupFechamentoControls() {
   document.getElementById('fechamento-end-date').addEventListener('change', renderFechamento);
 }
 
-function matchesFilterDate(dateStr) {
+function matchesFilterDate(dateStr)
+{
   const [y, m] = dateStr.split('-').map(Number);
   if (state.fechamentoMode === 'mes') {
     return y === state.fechamentoYear && (m - 1) === state.fechamentoMonth;
@@ -590,32 +641,36 @@ function matchesFilterDate(dateStr) {
   return true;
 }
 
-function renderFechamento() {
+function renderFechamento()
+{
   const listEl = document.getElementById('fechamento-list');
   const grouped = {};
+  const periodKey = getCurrentPeriodKey();
 
-  // 1. Collect recurring logs (exclude 'pending' or show all non-pending)
+  // 1. Collect recurring logs (exclude 'pending')
   state.attendanceLogs
     .filter(l => l.status !== 'pending' && matchesFilterDate(l.session_date))
     .forEach(l => {
       const client = state.clients.find(c => c.id === l.client_id);
       if (!client) return;
-      if (!grouped[client.id]) {
-        grouped[client.id] = { name: client.name, phone: client.phone, color: client.card_color, total: 0, items: [] };
+      const key = String(client.id);
+      if (!grouped[key]) {
+        grouped[key] = { key, name: client.name, phone: client.phone, color: client.card_color, total: 0, items: [] };
       }
       const amt = (l.status === 'attended' || l.status === 'unexcused') ? Number(l.price) : 0;
-      grouped[client.id].total += amt;
-      grouped[client.id].items.push({ date: l.session_date, status: l.status, amount: amt });
+      grouped[key].total += amt;
+      grouped[key].items.push({ date: l.session_date, status: l.status, amount: amt });
     });
 
   // 2. Collect single / avulsa classes
   state.singleClasses
     .filter(sc => matchesFilterDate(sc.session_date))
     .forEach(sc => {
-      const key = sc.client_id || `guest_${sc.guest_name}`;
+      const key = sc.client_id ? String(sc.client_id) : `guest_${sc.guest_name}`;
       const client = state.clients.find(c => c.id === sc.client_id);
       if (!grouped[key]) {
         grouped[key] = {
+          key,
           name: client ? client.name : sc.guest_name,
           phone: client?.phone || '',
           color: client ? client.card_color : '#00B2E3',
@@ -634,11 +689,61 @@ function renderFechamento() {
     return;
   }
 
-  listEl.innerHTML = groups.map((g, idx) => {
+  let totalRecebido = 0;
+  let totalAReceber = 0;
+
+  groups.forEach(g => {
+    const payRec = state.payments.find(p => p.client_key === g.key && p.period_key === periodKey);
+    g.isPaid = payRec ? Boolean(payRec.paid) : false;
+    if (g.isPaid) {
+      totalRecebido += g.total;
+    } else {
+      totalAReceber += g.total;
+    }
+  });
+
+  const summaryHtml = `
+    <div class="fechamento-summary">
+      <div class="summary-card received">
+        <span class="summary-label">RECEBIDO</span>
+        <span class="summary-val">R$ ${totalRecebido}</span>
+      </div>
+      <div class="summary-card pending">
+        <span class="summary-label">A RECEBER</span>
+        <span class="summary-val">R$ ${totalAReceber}</span>
+      </div>
+    </div>
+  `;
+
+  const groupsHtml = groups.map((g, idx) => {
     g.items.sort((a, b) => a.date.localeCompare(b.date));
     const linesHtml = g.items.map(it => `<div class="fechamento-line"> <div class="line-left"> <span class="mini-dot dot-${it.status}"></span> <span>${formatDateBR(it.date)}</span> </div> <span>${it.amount > 0 ? `R$ ${it.amount}` : '0'}</span> </div>`).join('');
-    return `<div class="fechamento-group"> <div class="fechamento-bar" style="background:${g.color}" data-idx="${idx}"> <span>R$ ${g.total} &nbsp;&nbsp; ${g.name}</span> <span>&gt;</span> </div> <div class="fechamento-details" id="f-det-${idx}"> <button class="share-whatsapp-btn" data-idx="${idx}" title="Enviar via WhatsApp">📤</button> ${linesHtml} </div> </div>`;
+    const badgeClass = g.isPaid ? 'pay-badge paid' : 'pay-badge unpaid';
+    const badgeLabel = g.isPaid ? 'PAGO ✓' : 'PENDENTE';
+
+    return `<div class="fechamento-group ${g.isPaid ? 'is-paid' : ''}">
+      <div class="fechamento-bar" style="background:${g.color}" data-idx="${idx}">
+        <span class="bar-main-text">R$ ${g.total} &nbsp;&nbsp; ${g.name}</span>
+        <div class="bar-right-actions">
+          <button type="button" class="${badgeClass}" data-key="${g.key}" data-amount="${g.total}" title="Marcar como pago/pendente">${badgeLabel}</button>
+          <span>&gt;</span>
+        </div>
+      </div>
+      <div class="fechamento-details" id="f-det-${idx}">
+        <button class="share-whatsapp-btn" data-idx="${idx}" title="Enviar via WhatsApp">📤</button>
+        ${linesHtml}
+      </div>
+    </div>`;
   }).join('');
+
+  listEl.innerHTML = summaryHtml + groupsHtml;
+
+  listEl.querySelectorAll('.pay-badge').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleClientPayment(btn.dataset.key, periodKey, Number(btn.dataset.amount));
+    });
+  });
 
   listEl.querySelectorAll('.fechamento-bar').forEach(bar => {
     bar.addEventListener('click', () => {
