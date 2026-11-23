@@ -215,6 +215,7 @@ function renderAgendaTimeline() {
 
   const isoDate = formatDateISO(state.selectedDate);
   const weekdayKey = DAY_KEYS[state.selectedDate.getDay()];
+  const is45Min = Number(state.settings.class_duration) === 45;
 
   // Gather recurring clients for this weekday + single classes for this exact date
   const sessions = [];
@@ -266,9 +267,16 @@ function renderAgendaTimeline() {
     slotSessions.forEach(sess => {
       const item = document.createElement('div');
       item.className = 'session-item';
-      item.innerHTML = `<div class="session-pill" style="background:${sess.color}"><span>${sess.name} ${sess.time.endsWith(':00') ? '' : `<small>(${sess.time})</small>`}</span><button type="button" class="status-dot-btn status-${sess.status}" title="Alterar status"></button></div>`;
+      const pillStyle = is45Min
+        ? `background:${sess.color}; width:75%;`
+        : `background:${sess.color}; width:100%;`;
+
+      item.innerHTML = `<div class="session-pill" style="${pillStyle}"><span>${sess.name} ${sess.time.endsWith(':00') ? '' : `<small>(${sess.time})</small>`}</span><button type="button" class="status-dot-btn status-${sess.status}" title="Alterar status"></button></div>`;
       const dotBtn = item.querySelector('.status-dot-btn');
-      dotBtn.addEventListener('click', () => toggleSessionStatus(sess, isoDate));
+      dotBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleSessionStatus(sess, isoDate);
+      });
       slotEl.appendChild(item);
     });
     timeline.appendChild(row);
@@ -277,7 +285,9 @@ function renderAgendaTimeline() {
 
 async function toggleSessionStatus(sess, isoDate) {
   if (sess.type === 'single') return; // Single classes keep purple/paid badge
-  const nextIdx = (STATUS_CYCLE.indexOf(sess.status) + 1) % STATUS_CYCLE.length;
+  const currentStatus = sess.status || 'pending';
+  const currentIdx = STATUS_CYCLE.indexOf(currentStatus);
+  const nextIdx = (currentIdx >= 0 ? currentIdx + 1 : 1) % STATUS_CYCLE.length;
   const newStatus = STATUS_CYCLE[nextIdx];
   const chargedPrice = (newStatus === 'attended' || newStatus === 'unexcused') ? sess.price : 0;
 
@@ -293,12 +303,38 @@ async function toggleSessionStatus(sess, isoDate) {
     status: newStatus
   };
 
-  if (existingIdx >= 0) state.attendanceLogs[existingIdx] = { ...state.attendanceLogs[existingIdx], ...record };
-  else state.attendanceLogs.push(record);
+  if (existingIdx >= 0) {
+    state.attendanceLogs[existingIdx] = { ...state.attendanceLogs[existingIdx], ...record };
+  } else {
+    state.attendanceLogs.push(record);
+  }
+
   renderAgendaTimeline();
 
-  // Persist to Supabase
-  await sb.from('attendance_logs').upsert(record, { onConflict: 'client_id,session_date' });
+  // Persist to Supabase (safe update-or-insert even without unique constraint)
+  const { data: updated, error: updErr } = await sb
+    .from('attendance_logs')
+    .update({ status: newStatus, price: chargedPrice, session_time: sess.time })
+    .eq('client_id', sess.clientId)
+    .eq('session_date', isoDate)
+    .select();
+
+  if (updErr || !updated || updated.length === 0) {
+    const { data: inserted, error: insErr } = await sb
+      .from('attendance_logs')
+      .insert(record)
+      .select()
+      .single();
+
+    if (insErr) {
+      console.error('Erro ao salvar presença no Supabase:', insErr.message);
+    } else if (inserted) {
+      const idx = state.attendanceLogs.findIndex(
+        l => l.client_id === sess.clientId && l.session_date === isoDate
+      );
+      if (idx >= 0) state.attendanceLogs[idx] = inserted;
+    }
+  }
 }
 
 // ============================================================================
@@ -713,9 +749,10 @@ function setupAjustesControls() {
   });
 
   document.getElementById('set-duration-btn').addEventListener('click', (e) => {
-    const next = state.settings.class_duration === 60 ? 45 : 60;
+    const next = Number(state.settings.class_duration) === 60 ? 45 : 60;
     e.target.textContent = next;
     saveSettings({ class_duration: next });
+    renderAgendaTimeline();
   });
 
   document.getElementById('set-weekends').addEventListener('change', (e) => {
