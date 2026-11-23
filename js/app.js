@@ -1,7 +1,7 @@
 // ============================================================================
 // 1. SUPABASE CONFIGURATION (Replace with your actual Supabase credentials)
 // ============================================================================
-const SUPABASE_URL = 'https://supabase.co';
+const SUPABASE_URL = 'https://rrsrpuinegsugpkpjqjk.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_czOkclUth1KCPz9FFiw2fg_9ghWcbdG';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -266,421 +266,493 @@ function renderAgendaTimeline() {
     slotSessions.forEach(sess => {
       const item = document.createElement('div');
       item.className = 'session-item';
-Use code with caution.
-item.innerHTML = <div class="session-pill" style="background:${sess.color}"><span>${sess.name} ${sess.time.endsWith(':00') ? '' : (${sess.time})}</span><button type="button" class="status-dot-btn status-${sess.status}" title="Alterar status"></button></div>;
-const dotBtn = item.querySelector('.status-dot-btn');
-dotBtn.addEventListener('click', () => toggleSessionStatus(sess, isoDate));
-slotEl.appendChild(item);
-});
-timeline.appendChild(row);
+      item.innerHTML = `<div class="session-pill" style="background:${sess.color}"><span>${sess.name} ${sess.time.endsWith(':00') ? '' : `<small>(${sess.time})</small>`}</span><button type="button" class="status-dot-btn status-${sess.status}" title="Alterar status"></button></div>`;
+      const dotBtn = item.querySelector('.status-dot-btn');
+      dotBtn.addEventListener('click', () => toggleSessionStatus(sess, isoDate));
+      slotEl.appendChild(item);
+    });
+    timeline.appendChild(row);
+  }
 }
-}
+
 async function toggleSessionStatus(sess, isoDate) {
-if (sess.type === 'single') return; // Single classes keep purple/paid badge
-const nextIdx = (STATUS_CYCLE.indexOf(sess.status) + 1) % STATUS_CYCLE.length;
-const newStatus = STATUS_CYCLE[nextIdx];
-const chargedPrice = (newStatus === 'attended' || newStatus === 'unexcused') ? sess.price : 0;
-// Optimistic local update
-const existingIdx = state.attendanceLogs.findIndex(
-l => l.client_id === sess.clientId && l.session_date === isoDate
-);
-const record = {
-client_id: sess.clientId,
-session_date: isoDate,
-session_time: sess.time,
-price: chargedPrice,
-status: newStatus
-};
-if (existingIdx >= 0) state.attendanceLogs[existingIdx] = { ...state.attendanceLogs[existingIdx], ...record };
-else state.attendanceLogs.push(record);
-renderAgendaTimeline();
-// Persist to Supabase
-await sb.from('attendance_logs').upsert(record, { onConflict: 'client_id,session_date' });
+  if (sess.type === 'single') return; // Single classes keep purple/paid badge
+  const nextIdx = (STATUS_CYCLE.indexOf(sess.status) + 1) % STATUS_CYCLE.length;
+  const newStatus = STATUS_CYCLE[nextIdx];
+  const chargedPrice = (newStatus === 'attended' || newStatus === 'unexcused') ? sess.price : 0;
+
+  // Optimistic local update
+  const existingIdx = state.attendanceLogs.findIndex(
+    l => l.client_id === sess.clientId && l.session_date === isoDate
+  );
+  const record = {
+    client_id: sess.clientId,
+    session_date: isoDate,
+    session_time: sess.time,
+    price: chargedPrice,
+    status: newStatus
+  };
+
+  if (existingIdx >= 0) state.attendanceLogs[existingIdx] = { ...state.attendanceLogs[existingIdx], ...record };
+  else state.attendanceLogs.push(record);
+  renderAgendaTimeline();
+
+  // Persist to Supabase
+  await sb.from('attendance_logs').upsert(record, { onConflict: 'client_id,session_date' });
 }
+
 // ============================================================================
 // 6. AULA AVULSA (DEMO / MAKE-UP CLASS WITH DUAL WHEELS)
 // ============================================================================
 const WHEEL_TIMES = [];
 for (let h = 6; h <= 21; h++) {
-['00', '15', '30', '45'].forEach(m => WHEEL_TIMES.push(${String(h).padStart(2, '0')}:${m}));
+  ['00', '15', '30', '45'].forEach(m => WHEEL_TIMES.push(`${String(h).padStart(2, '0')}:${m}`));
 }
 const WHEEL_PRICES = Array.from({ length: 61 }, (_, i) => i * 5); // R$ 0 to R$ 300
+
 function buildWheel(colEl, items, formatter = v => v) {
-colEl.innerHTML = items.map(v => <div class="wheel-item" data-val="${v}">${formatter(v)}</div>).join('');
+  colEl.innerHTML = items.map(v => `<div class="wheel-item" data-val="${v}">${formatter(v)}</div>`).join('');
 }
+
 function getWheelValue(colEl, items) {
-const idx = Math.round(colEl.scrollTop / 36);
-return items[Math.min(Math.max(idx, 0), items.length - 1)];
+  const idx = Math.round(colEl.scrollTop / 36);
+  return items[Math.min(Math.max(idx, 0), items.length - 1)];
 }
+
 function setWheelValue(colEl, items, val) {
-const idx = items.indexOf(val);
-if (idx >= 0) colEl.scrollTop = idx * 36;
+  const idx = items.indexOf(val);
+  if (idx >= 0) colEl.scrollTop = idx * 36;
 }
+
 function setupAvulsaControls() {
-const timeCol = document.getElementById('avulsa-time-col');
-const priceCol = document.getElementById('avulsa-price-col');
-buildWheel(timeCol, WHEEL_TIMES);
-buildWheel(priceCol, WHEEL_PRICES, v => R$ ${v});
-document.getElementById('btn-open-avulsa').addEventListener('click', () => {
-const d = state.selectedDate;
-const dd = String(d.getDate()).padStart(2, '0');
-const mm = String(d.getMonth() + 1).padStart(2, '0');
-const yy = String(d.getFullYear()).slice(-2);
-document.getElementById('avulsa-title').textContent = Aula Avulsa - ${dd}/${mm}/${yy};
-// Populate dropdown with existing clients
-const sel = document.getElementById('avulsa-client-select');
-sel.innerHTML = <option value="">⌄</option> +
-state.clients.map(c => <option value="${c.id}">${c.name}</option>).join('');
-document.getElementById('avulsa-name-input').value = '';
-showView('view-avulsa');
-setWheelValue(timeCol, WHEEL_TIMES, '08:00');
-setWheelValue(priceCol, WHEEL_PRICES, 0);
-});
-// Selecting an existing client auto-fills name & defaults price to R$ 0 (make-up class)
-document.getElementById('avulsa-client-select').addEventListener('change', (e) => {
-const client = state.clients.find(c => c.id === e.target.value);
-if (client) {
-document.getElementById('avulsa-name-input').value = client.name;
-setWheelValue(priceCol, WHEEL_PRICES, 0);
+  const timeCol = document.getElementById('avulsa-time-col');
+  const priceCol = document.getElementById('avulsa-price-col');
+  buildWheel(timeCol, WHEEL_TIMES);
+  buildWheel(priceCol, WHEEL_PRICES, v => `R$ ${v}`);
+
+  document.getElementById('btn-open-avulsa').addEventListener('click', () => {
+    const d = state.selectedDate;
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yy = String(d.getFullYear()).slice(-2);
+    document.getElementById('avulsa-title').textContent = `Aula Avulsa - ${dd}/${mm}/${yy}`;
+
+    // Populate dropdown with existing clients
+    const sel = document.getElementById('avulsa-client-select');
+    sel.innerHTML = `<option value="">⌄</option>` +
+      state.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
+    document.getElementById('avulsa-name-input').value = '';
+    showView('view-avulsa');
+    setWheelValue(timeCol, WHEEL_TIMES, '08:00');
+    setWheelValue(priceCol, WHEEL_PRICES, 0);
+  });
+
+  // Selecting an existing client auto-fills name & defaults price to R$ 0 (make-up class)
+  document.getElementById('avulsa-client-select').addEventListener('change', (e) => {
+    const client = state.clients.find(c => c.id === e.target.value);
+    if (client) {
+      document.getElementById('avulsa-name-input').value = client.name;
+      setWheelValue(priceCol, WHEEL_PRICES, 0);
+    }
+  });
+
+  document.getElementById('btn-cancel-avulsa').addEventListener('click', () => showView('view-agenda'));
+
+  document.getElementById('btn-save-avulsa').addEventListener('click', async () => {
+    const guestName = document.getElementById('avulsa-name-input').value.trim();
+    if (!guestName) return alert('Digite ou selecione um nome.');
+
+    const selectedClientId = document.getElementById('avulsa-client-select').value || null;
+    const chosenTime = getWheelValue(timeCol, WHEEL_TIMES);
+    const chosenPrice = getWheelValue(priceCol, WHEEL_PRICES);
+
+    const newRecord = {
+      client_id: selectedClientId,
+      guest_name: guestName,
+      session_date: formatDateISO(state.selectedDate),
+      session_time: chosenTime,
+      price: chosenPrice,
+      status: 'avulsa'
+    };
+
+    const { data } = await sb.from('single_classes').insert(newRecord).select().single();
+    state.singleClasses.push(data || newRecord);
+    showView('view-agenda');
+    renderAgendaTimeline();
+  });
 }
-});
-document.getElementById('btn-cancel-avulsa').addEventListener('click', () => showView('view-agenda'));
-document.getElementById('btn-save-avulsa').addEventListener('click', async () => {
-const guestName = document.getElementById('avulsa-name-input').value.trim();
-if (!guestName) return alert('Digite ou selecione um nome.');
-const selectedClientId = document.getElementById('avulsa-client-select').value || null;
-const chosenTime = getWheelValue(timeCol, WHEEL_TIMES);
-const chosenPrice = getWheelValue(priceCol, WHEEL_PRICES);
-const newRecord = {
-client_id: selectedClientId,
-guest_name: guestName,
-session_date: formatDateISO(state.selectedDate),
-session_time: chosenTime,
-price: chosenPrice,
-status: 'avulsa'
-};
-const { data } = await sb.from('single_classes').insert(newRecord).select().single();
-state.singleClasses.push(data || newRecord);
-showView('view-agenda');
-renderAgendaTimeline();
-});
-}
+
 // ============================================================================
 // 7. CLIENTES & INFO (ADD / EDIT CLIENT)
 // ============================================================================
 function renderClientesList() {
-const container = document.getElementById('clients-list');
-const days = state.settings.show_weekends
-? ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'DOM']
-: ['SEG', 'TER', 'QUA', 'QUI', 'SEX'];
-container.innerHTML = state.clients.map(client => {
-const colsHtml = days.map(d => <div> ${d} <span>${client.weekly_schedule?.[d] || ''}</span> </div>).join('');
-return <div class="client-card-wrap" data-id="${client.id}"> <div class="client-card" style="background:${client.card_color}"> <div class="card-top-badge" style="background:${client.card_color}"></div> <div class="card-main-row"> <h3>${client.name}</h3> <div class="avatar-circle">👤</div> </div> <div class="card-days-row">${colsHtml}</div> </div> <span class="card-outer-chevron">&gt;</span> </div>;
-}).join('');
-container.querySelectorAll('.client-card-wrap').forEach(card => {
-card.addEventListener('click', () => openInfoScreen(card.dataset.id));
-});
+  const container = document.getElementById('clients-list');
+  const days = state.settings.show_weekends
+    ? ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'DOM']
+    : ['SEG', 'TER', 'QUA', 'QUI', 'SEX'];
+
+  container.innerHTML = state.clients.map(client => {
+    const colsHtml = days.map(d => `<div> ${d} <span>${client.weekly_schedule?.[d] || ''}</span> </div>`).join('');
+    return `<div class="client-card-wrap" data-id="${client.id}"> <div class="client-card" style="background:${client.card_color}"> <div class="card-top-badge" style="background:${client.card_color}"></div> <div class="card-main-row"> <h3>${client.name}</h3> <div class="avatar-circle">👤</div> </div> <div class="card-days-row">${colsHtml}</div> </div> <span class="card-outer-chevron">&gt;</span> </div>`;
+  }).join('');
+
+  container.querySelectorAll('.client-card-wrap').forEach(card => {
+    card.addEventListener('click', () => openInfoScreen(card.dataset.id));
+  });
 }
+
 function openInfoScreen(clientId = null) {
-state.editingClientId = clientId;
-const client = clientId ? state.clients.find(c => c.id === clientId) : null;
-document.getElementById('info-name').value = client ? client.name : '';
-document.getElementById('info-phone').value = client ? (client.phone || '') : '';
-document.getElementById('info-rate').value = client ? client.hourly_rate : state.settings.default_price;
-state.selectedColor = client ? client.card_color : '#00B2E3';
-document.getElementById('btn-delete-client').classList.toggle('hidden', !client);
-// Sync color swatches
-document.querySelectorAll('.swatch').forEach(sw => {
-sw.classList.toggle('active', sw.dataset.color === state.selectedColor);
-});
-// Render weekday toggles + time inputs
-const days = state.settings.show_weekends
-? ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'DOM']
-: ['SEG', 'TER', 'QUA', 'QUI', 'SEX'];
-const sched = client?.weekly_schedule || {};
-const box = document.getElementById('info-weekdays-box');
-box.innerHTML = days.map(day => {
-const activeTime = sched[day] || '';
-return <div class="schedule-day-row" data-day="${day}"> <button type="button" class="day-pill-btn ${activeTime ? 'active' : ''}">${day}</button> <input type="time" class="day-time-input ${activeTime ? '' : 'hidden'}" value="${activeTime || '12:00'}" step="900" /> </div>;
-}).join('');
-box.querySelectorAll('.day-pill-btn').forEach(btn => {
-btn.addEventListener('click', () => {
-btn.classList.toggle('active');
-const timeInput = btn.parentElement.querySelector('.day-time-input');
-timeInput.classList.toggle('hidden', !btn.classList.contains('active'));
-});
-});
-showView('view-info');
+  state.editingClientId = clientId;
+  const client = clientId ? state.clients.find(c => c.id === clientId) : null;
+
+  document.getElementById('info-name').value = client ? client.name : '';
+  document.getElementById('info-phone').value = client ? (client.phone || '') : '';
+  document.getElementById('info-rate').value = client ? client.hourly_rate : state.settings.default_price;
+  state.selectedColor = client ? client.card_color : '#00B2E3';
+
+  document.getElementById('btn-delete-client').classList.toggle('hidden', !client);
+
+  // Sync color swatches
+  document.querySelectorAll('.swatch').forEach(sw => {
+    sw.classList.toggle('active', sw.dataset.color === state.selectedColor);
+  });
+
+  // Render weekday toggles + time inputs
+  const days = state.settings.show_weekends
+    ? ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'DOM']
+    : ['SEG', 'TER', 'QUA', 'QUI', 'SEX'];
+  const sched = client?.weekly_schedule || {};
+  const box = document.getElementById('info-weekdays-box');
+
+  box.innerHTML = days.map(day => {
+    const activeTime = sched[day] || '';
+    return `<div class="schedule-day-row" data-day="${day}"> <button type="button" class="day-pill-btn ${activeTime ? 'active' : ''}">${day}</button> <input type="time" class="day-time-input ${activeTime ? '' : 'hidden'}" value="${activeTime || '12:00'}" step="900" /> </div>`;
+  }).join('');
+
+  box.querySelectorAll('.day-pill-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('active');
+      const timeInput = btn.parentElement.querySelector('.day-time-input');
+      timeInput.classList.toggle('hidden', !btn.classList.contains('active'));
+    });
+  });
+
+  showView('view-info');
 }
+
 function setupClientInfoControls() {
-document.getElementById('btn-add-client').addEventListener('click', () => openInfoScreen(null));
-document.getElementById('btn-back-info').addEventListener('click', () => showView('view-clientes'));
-document.querySelectorAll('.swatch').forEach(sw => {
-sw.addEventListener('click', () => {
-document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
-sw.classList.add('active');
-state.selectedColor = sw.dataset.color;
-});
-});
-document.getElementById('btn-save-client').addEventListener('click', async () => {
-const name = document.getElementById('info-name').value.trim();
-if (!name) return alert('Por favor, informe o nome do aluno.');
-const weekly_schedule = {};
-document.querySelectorAll('.schedule-day-row').forEach(row => {
-const btn = row.querySelector('.day-pill-btn');
-const input = row.querySelector('.day-time-input');
-if (btn.classList.contains('active')) {
-weekly_schedule[row.dataset.day] = input.value;
+  document.getElementById('btn-add-client').addEventListener('click', () => openInfoScreen(null));
+  document.getElementById('btn-back-info').addEventListener('click', () => showView('view-clientes'));
+
+  document.querySelectorAll('.swatch').forEach(sw => {
+    sw.addEventListener('click', () => {
+      document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+      sw.classList.add('active');
+      state.selectedColor = sw.dataset.color;
+    });
+  });
+
+  document.getElementById('btn-save-client').addEventListener('click', async () => {
+    const name = document.getElementById('info-name').value.trim();
+    if (!name) return alert('Por favor, informe o nome do aluno.');
+
+    const weekly_schedule = {};
+    document.querySelectorAll('.schedule-day-row').forEach(row => {
+      const btn = row.querySelector('.day-pill-btn');
+      const input = row.querySelector('.day-time-input');
+      if (btn.classList.contains('active')) {
+        weekly_schedule[row.dataset.day] = input.value;
+      }
+    });
+
+    const payload = {
+      name,
+      phone: document.getElementById('info-phone').value.trim(),
+      hourly_rate: Number(document.getElementById('info-rate').value),
+      card_color: state.selectedColor,
+      weekly_schedule
+    };
+
+    if (state.editingClientId) {
+      await sb.from('clients').update(payload).eq('id', state.editingClientId);
+      const idx = state.clients.findIndex(c => c.id === state.editingClientId);
+      if (idx >= 0) state.clients[idx] = { ...state.clients[idx], ...payload };
+    } else {
+      const { data } = await sb.from('clients').insert(payload).select().single();
+      state.clients.push(data || { id: crypto.randomUUID(), ...payload });
+    }
+
+    showView('view-clientes');
+    renderAll();
+  });
+
+  document.getElementById('btn-delete-client').addEventListener('click', async () => {
+    if (!state.editingClientId || !confirm('Excluir este aluno?')) return;
+    await sb.from('clients').delete().eq('id', state.editingClientId);
+    state.clients = state.clients.filter(c => c.id !== state.editingClientId);
+    showView('view-clientes');
+    renderAll();
+  });
 }
-});
-const payload = {
-name,
-phone: document.getElementById('info-phone').value.trim(),
-hourly_rate: Number(document.getElementById('info-rate').value),
-card_color: state.selectedColor,
-weekly_schedule
-};
-if (state.editingClientId) {
-await sb.from('clients').update(payload).eq('id', state.editingClientId);
-const idx = state.clients.findIndex(c => c.id === state.editingClientId);
-if (idx >= 0) state.clients[idx] = { ...state.clients[idx], ...payload };
-} else {
-const { data } = await sb.from('clients').insert(payload).select().single();
-state.clients.push(data || { id: crypto.randomUUID(), ...payload });
-}
-showView('view-clientes');
-renderAll();
-});
-document.getElementById('btn-delete-client').addEventListener('click', async () => {
-if (!state.editingClientId || !confirm('Excluir este aluno?')) return;
-await sb.from('clients').delete().eq('id', state.editingClientId);
-state.clients = state.clients.filter(c => c.id !== state.editingClientId);
-showView('view-clientes');
-renderAll();
-});
-}
+
 // ============================================================================
 // 8. FECHAMENTO & WHATSAPP RECEIPT IMAGE GENERATOR
 // ============================================================================
 function setupFechamentoControls() {
-const monthCol = document.getElementById('fechamento-month-col');
-const yearCol = document.getElementById('fechamento-year-col');
-const years =;
-buildWheel(monthCol, MONTH_SHORT);
-buildWheel(yearCol, years);
-setTimeout(() => {
-setWheelValue(monthCol, MONTH_SHORT, MONTH_SHORT[state.fechamentoMonth]);
-setWheelValue(yearCol, years, state.fechamentoYear);
-}, 50);
-monthCol.addEventListener('scroll', () => {
-const val = getWheelValue(monthCol, MONTH_SHORT);
-state.fechamentoMonth = MONTH_SHORT.indexOf(val);
-renderFechamento();
-});
-yearCol.addEventListener('scroll', () => {
-state.fechamentoYear = getWheelValue(yearCol, years);
-renderFechamento();
-});
-document.querySelectorAll('.seg-btn').forEach(btn => {
-btn.addEventListener('click', () => {
-document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
-btn.classList.add('active');
-state.fechamentoMode = btn.dataset.mode;
-document.querySelectorAll('.filter-panel').forEach(p => p.classList.remove('active'));
-document.getElementById(filter-${state.fechamentoMode}).classList.add('active');
-renderFechamento();
-});
-});
-document.getElementById('fechamento-start-date').addEventListener('change', renderFechamento);
-document.getElementById('fechamento-end-date').addEventListener('change', renderFechamento);
+  const monthCol = document.getElementById('fechamento-month-col');
+  const yearCol = document.getElementById('fechamento-year-col');
+  const years = [2024, 2025, 2026, 2027, 2028, 2029, 2030];
+
+  buildWheel(monthCol, MONTH_SHORT);
+  buildWheel(yearCol, years);
+
+  setTimeout(() => {
+    setWheelValue(monthCol, MONTH_SHORT, MONTH_SHORT[state.fechamentoMonth]);
+    setWheelValue(yearCol, years, state.fechamentoYear);
+  }, 50);
+
+  monthCol.addEventListener('scroll', () => {
+    const val = getWheelValue(monthCol, MONTH_SHORT);
+    state.fechamentoMonth = MONTH_SHORT.indexOf(val);
+    renderFechamento();
+  });
+
+  yearCol.addEventListener('scroll', () => {
+    state.fechamentoYear = getWheelValue(yearCol, years);
+    renderFechamento();
+  });
+
+  document.querySelectorAll('.seg-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.fechamentoMode = btn.dataset.mode;
+      document.querySelectorAll('.filter-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById(`filter-${state.fechamentoMode}`).classList.add('active');
+      renderFechamento();
+    });
+  });
+
+  document.getElementById('fechamento-start-date').addEventListener('change', renderFechamento);
+  document.getElementById('fechamento-end-date').addEventListener('change', renderFechamento);
 }
+
 function matchesFilterDate(dateStr) {
-const [y, m] = dateStr.split('-').map(Number);
-if (state.fechamentoMode === 'mes') {
-return y === state.fechamentoYear && (m - 1) === state.fechamentoMonth;
+  const [y, m] = dateStr.split('-').map(Number);
+  if (state.fechamentoMode === 'mes') {
+    return y === state.fechamentoYear && (m - 1) === state.fechamentoMonth;
+  }
+  if (state.fechamentoMode === 'ano') {
+    return y === state.fechamentoYear;
+  }
+  const start = document.getElementById('fechamento-start-date').value;
+  const end = document.getElementById('fechamento-end-date').value;
+  if (start && dateStr < start) return false;
+  if (end && dateStr > end) return false;
+  return true;
 }
-if (state.fechamentoMode === 'ano') {
-return y === state.fechamentoYear;
-}
-const start = document.getElementById('fechamento-start-date').value;
-const end = document.getElementById('fechamento-end-date').value;
-if (start && dateStr < start) return false;
-if (end && dateStr > end) return false;
-return true;
-}
+
 function renderFechamento() {
-const listEl = document.getElementById('fechamento-list');
-const grouped = {};
-// 1. Collect recurring logs (exclude 'pending' or show all non-pending)
-state.attendanceLogs
-.filter(l => l.status !== 'pending' && matchesFilterDate(l.session_date))
-.forEach(l => {
-const client = state.clients.find(c => c.id === l.client_id);
-if (!client) return;
-if (!grouped[client.id]) {
-grouped[client.id] = { name: client.name, phone: client.phone, color: client.card_color, total: 0, items: [] };
+  const listEl = document.getElementById('fechamento-list');
+  const grouped = {};
+
+  // 1. Collect recurring logs (exclude 'pending' or show all non-pending)
+  state.attendanceLogs
+    .filter(l => l.status !== 'pending' && matchesFilterDate(l.session_date))
+    .forEach(l => {
+      const client = state.clients.find(c => c.id === l.client_id);
+      if (!client) return;
+      if (!grouped[client.id]) {
+        grouped[client.id] = { name: client.name, phone: client.phone, color: client.card_color, total: 0, items: [] };
+      }
+      const amt = (l.status === 'attended' || l.status === 'unexcused') ? Number(l.price) : 0;
+      grouped[client.id].total += amt;
+      grouped[client.id].items.push({ date: l.session_date, status: l.status, amount: amt });
+    });
+
+  // 2. Collect single / avulsa classes
+  state.singleClasses
+    .filter(sc => matchesFilterDate(sc.session_date))
+    .forEach(sc => {
+      const key = sc.client_id || `guest_${sc.guest_name}`;
+      const client = state.clients.find(c => c.id === sc.client_id);
+      if (!grouped[key]) {
+        grouped[key] = {
+          name: client ? client.name : sc.guest_name,
+          phone: client?.phone || '',
+          color: client ? client.card_color : '#00B2E3',
+          total: 0,
+          items: []
+        };
+      }
+      const amt = Number(sc.price);
+      grouped[key].total += amt;
+      grouped[key].items.push({ date: sc.session_date, status: 'avulsa', amount: amt });
+    });
+
+  const groups = Object.values(grouped);
+  if (!groups.length) {
+    listEl.innerHTML = `<p style="text-align:center;color:#888;margin-top:24px;">Nenhuma aula registrada neste período.</p>`;
+    return;
+  }
+
+  listEl.innerHTML = groups.map((g, idx) => {
+    g.items.sort((a, b) => a.date.localeCompare(b.date));
+    const linesHtml = g.items.map(it => `<div class="fechamento-line"> <div class="line-left"> <span class="mini-dot dot-${it.status}"></span> <span>${formatDateBR(it.date)}</span> </div> <span>${it.amount > 0 ? `R$ ${it.amount}` : '0'}</span> </div>`).join('');
+    return `<div class="fechamento-group"> <div class="fechamento-bar" style="background:${g.color}" data-idx="${idx}"> <span>R$ ${g.total} &nbsp;&nbsp; ${g.name}</span> <span>&gt;</span> </div> <div class="fechamento-details" id="f-det-${idx}"> <button class="share-whatsapp-btn" data-idx="${idx}" title="Enviar via WhatsApp">📤</button> ${linesHtml} </div> </div>`;
+  }).join('');
+
+  listEl.querySelectorAll('.fechamento-bar').forEach(bar => {
+    bar.addEventListener('click', () => {
+      document.getElementById(`f-det-${bar.dataset.idx}`).classList.toggle('open');
+    });
+  });
+
+  listEl.querySelectorAll('.share-whatsapp-btn').forEach(btn => {
+    btn.addEventListener('click', () => shareReceiptViaWhatsApp(groups[btn.dataset.idx]));
+  });
 }
-const amt = (l.status === 'attended' || l.status === 'unexcused') ? Number(l.price) : 0;
-grouped[client.id].total += amt;
-grouped[client.id].items.push({ date: l.session_date, status: l.status, amount: amt });
-});
-// 2. Collect single / avulsa classes
-state.singleClasses
-.filter(sc => matchesFilterDate(sc.session_date))
-.forEach(sc => {
-const key = sc.client_id || guest_${sc.guest_name};
-const client = state.clients.find(c => c.id === sc.client_id);
-if (!grouped[key]) {
-grouped[key] = {
-name: client ? client.name : sc.guest_name,
-phone: client?.phone || '',
-color: client ? client.card_color : '#00B2E3',
-total: 0,
-items: []
-};
-}
-const amt = Number(sc.price);
-grouped[key].total += amt;
-grouped[key].items.push({ date: sc.session_date, status: 'avulsa', amount: amt });
-});
-const groups = Object.values(grouped);
-if (!groups.length) {
-listEl.innerHTML = <p style="text-align:center;color:#888;margin-top:24px;">Nenhuma aula registrada neste período.</p>;
-return;
-}
-listEl.innerHTML = groups.map((g, idx) => {
-g.items.sort((a, b) => a.date.localeCompare(b.date));
-const linesHtml = g.items.map(it => <div class="fechamento-line"> <div class="line-left"> <span class="mini-dot dot-${it.status}"></span> <span>${formatDateBR(it.date)}</span> </div> <span>${it.amount > 0 ? R$ ${it.amount} : '0'}</span> </div>).join('');
-return <div class="fechamento-group"> <div class="fechamento-bar" style="background:${g.color}" data-idx="${idx}"> <span>R$ ${g.total} &nbsp;&nbsp; ${g.name}</span> <span>&gt;</span> </div> <div class="fechamento-details" id="f-det-${idx}"> <button class="share-whatsapp-btn" data-idx="${idx}" title="Enviar via WhatsApp">📤</button> ${linesHtml} </div> </div>;
-}).join('');
-listEl.querySelectorAll('.fechamento-bar').forEach(bar => {
-bar.addEventListener('click', () => {
-document.getElementById(f-det-${bar.dataset.idx}).classList.toggle('open');
-});
-});
-listEl.querySelectorAll('.share-whatsapp-btn').forEach(btn => {
-btn.addEventListener('click', () => shareReceiptViaWhatsApp(groups[btn.dataset.idx]));
-});
-}
+
 async function shareReceiptViaWhatsApp(group) {
-const canvas = document.getElementById('receipt-canvas');
-const ctx = canvas.getContext('2d');
-const h = Math.max(760, 560 + group.items.length * 52);
-canvas.height = h;
-// White background
-ctx.fillStyle = '#ffffff';
-ctx.fillRect(0, 0, 720, h);
-// Top Trainer Header Banner (Matching Screenshot)
-ctx.fillStyle = '#7c6265';
-ctx.fillRect(0, 0, 720, 175);
-ctx.fillStyle = '#ffffff';
-ctx.font = 'bold 38px sans-serif';
-ctx.textAlign = 'center';
-ctx.fillText(state.settings.trainer_name, 360, 88);
-ctx.font = '18px sans-serif';
-ctx.fillStyle = '#f0e6e7';
-ctx.fillText(state.settings.trainer_subtitle, 360, 125);
-// Period text
-const firstDate = group.items[0] ? formatDateBR(group.items[0].date) : '';
-const lastDate = group.items[group.items.length - 1] ? formatDateBR(group.items[group.items.length - 1].date) : '';
-ctx.fillStyle = '#222222';
-ctx.font = '28px sans-serif';
-ctx.fillText(Olá ${group.name}, segue resumo das, 360, 245);
-ctx.fillText(aulas entre ${firstDate} e ${lastDate}., 360, 282);
-// Total Badge
-ctx.fillStyle = '#7c6265';
-ctx.fillRect(145, 315, 430, 64);
-ctx.fillStyle = '#ffffff';
-ctx.font = 'bold 30px sans-serif';
-ctx.fillText(Valor total: R$ ${group.total}, 360, 357);
-// Custom Closing Message from Ajustes
-ctx.fillStyle = '#222222';
-ctx.font = '25px sans-serif';
-const msgLines = state.settings.fechamento_msg.split('\n');
-msgLines.forEach((line, i) => ctx.fillText(line, 360, 430 + i * 34));
-// Itemized Rows
-const dotColors = {
-attended: '#28a745',
-unexcused: '#dc3545',
-excused: '#007bff',
-avulsa: '#8e44ad'
-};
-group.items.forEach((it, idx) => {
-const y = 530 + idx * 50;
-ctx.beginPath();
-ctx.arc(115, y - 9, 14, 0, Math.PI * 2);
-ctx.fillStyle = dotColors[it.status] || '#888';
-ctx.fill();
-ctx.fillStyle = '#222222';
-ctx.font = '26px sans-serif';
-ctx.textAlign = 'left';
-ctx.fillText(formatDateBR(it.date), 165, y);
-ctx.textAlign = 'right';
-ctx.fillText(it.amount > 0 ? R$ ${it.amount} : '0', 610, y);
-});
-// Share PNG via Web Share API (opens WhatsApp directly on mobile)
-canvas.toBlob(async (blob) => {
-const file = new File([blob], fechamento-${group.name}.png, { type: 'image/png' });
-const textSummary = Olá ${group.name}, segue o fechamento: Valor total R$ ${group.total}. ${state.settings.fechamento_msg};
-if (navigator.canShare && navigator.canShare({ files: [file] })) {
-await navigator.share({ files: [file], text: textSummary });
-} else {
-const cleanPhone = (group.phone || '').replace(/\D/g, '');
-const waUrl = https://wa.me{cleanPhone ? '55' + cleanPhone : ''}?text=${encodeURIComponent(textSummary)};
-window.open(waUrl, '_blank');
+  const canvas = document.getElementById('receipt-canvas');
+  const ctx = canvas.getContext('2d');
+  const h = Math.max(760, 560 + group.items.length * 52);
+  canvas.height = h;
+
+  // White background
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, 720, h);
+
+  // Top Trainer Header Banner (Matching Screenshot)
+  ctx.fillStyle = '#7c6265';
+  ctx.fillRect(0, 0, 720, 175);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 38px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(state.settings.trainer_name, 360, 88);
+  ctx.font = '18px sans-serif';
+  ctx.fillStyle = '#f0e6e7';
+  ctx.fillText(state.settings.trainer_subtitle, 360, 125);
+
+  // Period text
+  const firstDate = group.items[0] ? formatDateBR(group.items[0].date) : '';
+  const lastDate = group.items[group.items.length - 1] ? formatDateBR(group.items[group.items.length - 1].date) : '';
+  ctx.fillStyle = '#222222';
+  ctx.font = '28px sans-serif';
+  ctx.fillText(`Olá ${group.name}, segue resumo das`, 360, 245);
+  ctx.fillText(`aulas entre ${firstDate} e ${lastDate}.`, 360, 282);
+
+  // Total Badge
+  ctx.fillStyle = '#7c6265';
+  ctx.fillRect(145, 315, 430, 64);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 30px sans-serif';
+  ctx.fillText(`Valor total: R$ ${group.total}`, 360, 357);
+
+  // Custom Closing Message from Ajustes
+  ctx.fillStyle = '#222222';
+  ctx.font = '25px sans-serif';
+  const msgLines = state.settings.fechamento_msg.split('\n');
+  msgLines.forEach((line, i) => ctx.fillText(line, 360, 430 + i * 34));
+
+  // Itemized Rows
+  const dotColors = {
+    attended: '#28a745',
+    unexcused: '#dc3545',
+    excused: '#007bff',
+    avulsa: '#8e44ad'
+  };
+
+  group.items.forEach((it, idx) => {
+    const y = 530 + idx * 50;
+    ctx.beginPath();
+    ctx.arc(115, y - 9, 14, 0, Math.PI * 2);
+    ctx.fillStyle = dotColors[it.status] || '#888';
+    ctx.fill();
+    ctx.fillStyle = '#222222';
+    ctx.font = '26px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(formatDateBR(it.date), 165, y);
+    ctx.textAlign = 'right';
+    ctx.fillText(it.amount > 0 ? `R$ ${it.amount}` : '0', 610, y);
+  });
+
+  // Share PNG via Web Share API (opens WhatsApp directly on mobile)
+  canvas.toBlob(async (blob) => {
+    const file = new File([blob], `fechamento-${group.name}.png`, { type: 'image/png' });
+    const textSummary = `Olá ${group.name}, segue o fechamento: Valor total R$ ${group.total}. ${state.settings.fechamento_msg}`;
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], text: textSummary });
+    } else {
+      const cleanPhone = (group.phone || '').replace(/\D/g, '');
+      const waUrl = `https://wa.me/${cleanPhone ? '55' + cleanPhone : ''}?text=${encodeURIComponent(textSummary)}`;
+      window.open(waUrl, '_blank');
+    }
+  }, 'image/png');
 }
-}, 'image/png');
-}
+
 // ============================================================================
 // 9. AJUSTES (SETTINGS)
 // ============================================================================
 function syncAjustesUI() {
-document.getElementById('set-default-rate').value = state.settings.default_price;
-document.getElementById('set-duration-btn').textContent = state.settings.class_duration;
-document.getElementById('set-weekends').checked = state.settings.show_weekends;
-document.getElementById('set-trainer-name').value = state.settings.trainer_name;
+  document.getElementById('set-default-rate').value = state.settings.default_price;
+  document.getElementById('set-duration-btn').textContent = state.settings.class_duration;
+  document.getElementById('set-weekends').checked = state.settings.show_weekends;
+  document.getElementById('set-trainer-name').value = state.settings.trainer_name;
 }
+
 async function saveSettings(partial) {
-state.settings = { ...state.settings, ...partial };
-await sb.from('trainer_settings').upsert({ id: 1, ...state.settings });
+  state.settings = { ...state.settings, ...partial };
+  await sb.from('trainer_settings').upsert({ id: 1, ...state.settings });
 }
+
 function setupAjustesControls() {
-document.getElementById('set-default-rate').addEventListener('change', (e) => {
-saveSettings({ default_price: Number(e.target.value) });
-});
-document.getElementById('set-duration-btn').addEventListener('click', (e) => {
-const next = state.settings.class_duration === 60 ? 45 : 60;
-e.target.textContent = next;
-saveSettings({ class_duration: next });
-});
-document.getElementById('set-weekends').addEventListener('change', (e) => {
-saveSettings({ show_weekends: e.target.checked });
-renderCalendar();
-renderClientesList();
-});
-document.getElementById('set-trainer-name').addEventListener('change', (e) => {
-saveSettings({ trainer_name: e.target.value.trim() });
-});
-// Message Editors
-const modal = document.getElementById('msg-modal');
-const textarea = document.getElementById('msg-modal-textarea');
-document.getElementById('btn-edit-msg-fechamento').addEventListener('click', () => {
-state.activeMsgKey = 'fechamento_msg';
-document.getElementById('msg-modal-title').textContent = 'Texto Fechamento';
-textarea.value = state.settings.fechamento_msg;
-modal.classList.remove('hidden');
-});
-document.getElementById('btn-edit-msg-aniversario').addEventListener('click', () => {
-state.activeMsgKey = 'birthday_msg';
-document.getElementById('msg-modal-title').textContent = 'Texto Aniversários';
-textarea.value = state.settings.birthday_msg;
-modal.classList.remove('hidden');
-});
-document.getElementById('btn-close-msg-modal').addEventListener('click', () => modal.classList.add('hidden'));
-document.getElementById('btn-save-msg-modal').addEventListener('click', () => {
-if (state.activeMsgKey) saveSettings({ [state.activeMsgKey]: textarea.value });
-modal.classList.add('hidden');
-});
+  document.getElementById('set-default-rate').addEventListener('change', (e) => {
+    saveSettings({ default_price: Number(e.target.value) });
+  });
+
+  document.getElementById('set-duration-btn').addEventListener('click', (e) => {
+    const next = state.settings.class_duration === 60 ? 45 : 60;
+    e.target.textContent = next;
+    saveSettings({ class_duration: next });
+  });
+
+  document.getElementById('set-weekends').addEventListener('change', (e) => {
+    saveSettings({ show_weekends: e.target.checked });
+    renderCalendar();
+    renderClientesList();
+  });
+
+  document.getElementById('set-trainer-name').addEventListener('change', (e) => {
+    saveSettings({ trainer_name: e.target.value.trim() });
+  });
+
+  // Message Editors
+  const modal = document.getElementById('msg-modal');
+  const textarea = document.getElementById('msg-modal-textarea');
+
+  document.getElementById('btn-edit-msg-fechamento').addEventListener('click', () => {
+    state.activeMsgKey = 'fechamento_msg';
+    document.getElementById('msg-modal-title').textContent = 'Texto Fechamento';
+    textarea.value = state.settings.fechamento_msg;
+    modal.classList.remove('hidden');
+  });
+
+  document.getElementById('btn-edit-msg-aniversario').addEventListener('click', () => {
+    state.activeMsgKey = 'birthday_msg';
+    document.getElementById('msg-modal-title').textContent = 'Texto Aniversários';
+    textarea.value = state.settings.birthday_msg;
+    modal.classList.remove('hidden');
+  });
+
+  document.getElementById('btn-close-msg-modal').addEventListener('click', () => modal.classList.add('hidden'));
+
+  document.getElementById('btn-save-msg-modal').addEventListener('click', () => {
+    if (state.activeMsgKey) saveSettings({ [state.activeMsgKey]: textarea.value });
+    modal.classList.add('hidden');
+  });
 }
+
 // Start App
 initApp();
