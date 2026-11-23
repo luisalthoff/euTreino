@@ -306,7 +306,7 @@ await sb.from('attendance_logs').upsert(record, { onConflict: 'client_id,session
 // ============================================================================
 const WHEEL_TIMES = [];
 for (let h = 6; h <= 21; h++) {
-['00', '15', '30', '45'].forEach(m => WHEEL_TIMES.push(${String(h).padStart(2, '0')}:${m}));
+['00', '15', '30', '45'].forEach(m => WHEEL_TIMES.push(`${String(h).padStart(2, '0')}:${m}`));
 }
 const WHEEL_PRICES = Array.from({ length: 61 }, (_, i) => i * 5); // R$ 0 to R$ 300
 function buildWheel(colEl, items, formatter = v => v) {
@@ -324,13 +324,13 @@ function setupAvulsaControls() {
 const timeCol = document.getElementById('avulsa-time-col');
 const priceCol = document.getElementById('avulsa-price-col');
 buildWheel(timeCol, WHEEL_TIMES);
-buildWheel(priceCol, WHEEL_PRICES, v => R$ ${v});
+buildWheel(priceCol, WHEEL_PRICES, v => R$ `${v}`);
 document.getElementById('btn-open-avulsa').addEventListener('click', () => {
 const d = state.selectedDate;
 const dd = String(d.getDate()).padStart(2, '0');
 const mm = String(d.getMonth() + 1).padStart(2, '0');
 const yy = String(d.getFullYear()).slice(-2);
-document.getElementById('avulsa-title').textContent = Aula Avulsa - ${dd}/${mm}/${yy};
+document.getElementById('avulsa-title').textContent = "Aula Avulsa - ${dd}/${mm}/${yy}";
 // Populate dropdown with existing clients
 const sel = document.getElementById('avulsa-client-select');
 sel.innerHTML = <option value="">⌄</option> +
@@ -491,7 +491,7 @@ document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'))
 btn.classList.add('active');
 state.fechamentoMode = btn.dataset.mode;
 document.querySelectorAll('.filter-panel').forEach(p => p.classList.remove('active'));
-document.getElementById(filter-${state.fechamentoMode}).classList.add('active');
+document.getElementById(filter-`${state.fechamentoMode}`).classList.add('active');
 renderFechamento();
 });
 });
@@ -532,7 +532,7 @@ grouped[client.id].items.push({ date: l.session_date, status: l.status, amount: 
 state.singleClasses
 .filter(sc => matchesFilterDate(sc.session_date))
 .forEach(sc => {
-const key = sc.client_id || guest_${sc.guest_name};
+const key = sc.client_id || `guest_${sc.guest_name}`;
 const client = state.clients.find(c => c.id === sc.client_id);
 if (!grouped[key]) {
 grouped[key] = {
@@ -554,137 +554,160 @@ return;
 }
 listEl.innerHTML = groups.map((g, idx) => {
 g.items.sort((a, b) => a.date.localeCompare(b.date));
-const linesHtml = g.items.map(it => <div class="fechamento-line"> <div class="line-left"> <span class="mini-dot dot-${it.status}"></span> <span>${formatDateBR(it.date)}</span> </div> <span>${it.amount > 0 ?R$ ${it.amount}: '0'}</span> </div>).join('');
-return <div class="fechamento-group"> <div class="fechamento-bar" style="background:${g.color}" data-idx="${idx}"> <span>R$ ${g.total} &nbsp;&nbsp; ${g.name}</span> <span>&gt;</span> </div> <div class="fechamento-details" id="f-det-${idx}"> <button class="share-whatsapp-btn" data-idx="${idx}" title="Enviar via WhatsApp">📤</button> ${linesHtml} </div> </div>;
-}).join('');
-listEl.querySelectorAll('.fechamento-bar').forEach(bar => {
-bar.addEventListener('click', () => {
-document.getElementById(f-det-${bar.dataset.idx}).classList.toggle('open');
-});
-});
-listEl.querySelectorAll('.share-whatsapp-btn').forEach(btn => {
-btn.addEventListener('click', () => shareReceiptViaWhatsApp(groups[btn.dataset.idx]));
-});
+    const linesHtml = g.items.map(it => `<div class="fechamento-line"> <div class="line-left"> <span class="mini-dot dot-${it.status}"></span> <span>${formatDateBR(it.date)}</span> </div> <span>${it.amount > 0 ? `R$ ${it.amount}` : '0'}</span> </div>`).join('');
+    return `<div class="fechamento-group"> <div class="fechamento-bar" style="background:${g.color}" data-idx="${idx}"> <span>R$ ${g.total} &nbsp;&nbsp; ${g.name}</span> <span>&gt;</span> </div> <div class="fechamento-details" id="f-det-${idx}"> <button class="share-whatsapp-btn" data-idx="${idx}" title="Enviar via WhatsApp">📤</button> ${linesHtml} </div> </div>`;
+  }).join('');
+
+  listEl.querySelectorAll('.fechamento-bar').forEach(bar => {
+    bar.addEventListener('click', () => {
+      document.getElementById(`f-det-${bar.dataset.idx}`).classList.toggle('open');
+    });
+  });
+
+  listEl.querySelectorAll('.share-whatsapp-btn').forEach(btn => {
+    btn.addEventListener('click', () => shareReceiptViaWhatsApp(groups[btn.dataset.idx]));
+  });
 }
+
 async function shareReceiptViaWhatsApp(group) {
-const canvas = document.getElementById('receipt-canvas');
-const ctx = canvas.getContext('2d');
-const h = Math.max(760, 560 + group.items.length * 52);
-canvas.height = h;
-// White background
-ctx.fillStyle = '#ffffff';
-ctx.fillRect(0, 0, 720, h);
-// Top Trainer Header Banner (Matching Screenshot)
-ctx.fillStyle = '#7c6265';
-ctx.fillRect(0, 0, 720, 175);
-ctx.fillStyle = '#ffffff';
-ctx.font = 'bold 38px sans-serif';
-ctx.textAlign = 'center';
-ctx.fillText(state.settings.trainer_name, 360, 88);
-ctx.font = '18px sans-serif';
-ctx.fillStyle = '#f0e6e7';
-ctx.fillText(state.settings.trainer_subtitle, 360, 125);
-// Period text
-const firstDate = group.items[0] ? formatDateBR(group.items[0].date) : '';
-const lastDate = group.items[group.items.length - 1] ? formatDateBR(group.items[group.items.length - 1].date) : '';
-ctx.fillStyle = '#222222';
-ctx.font = '28px sans-serif';
-ctx.fillText(Olá ${group.name}, segue resumo das, 360, 245);
-ctx.fillText(aulas entre ${firstDate} e ${lastDate}., 360, 282);
-// Total Badge
-ctx.fillStyle = '#7c6265';
-ctx.fillRect(145, 315, 430, 64);
-ctx.fillStyle = '#ffffff';
-ctx.font = 'bold 30px sans-serif';
-ctx.fillText(Valor total: R$ ${group.total}, 360, 357);
-// Custom Closing Message from Ajustes
-ctx.fillStyle = '#222222';
-ctx.font = '25px sans-serif';
-const msgLines = state.settings.fechamento_msg.split('\n');
-msgLines.forEach((line, i) => ctx.fillText(line, 360, 430 + i * 34));
-// Itemized Rows
-const dotColors = {
-attended: '#28a745',
-unexcused: '#dc3545',
-excused: '#007bff',
-avulsa: '#8e44ad'
-};
-group.items.forEach((it, idx) => {
-const y = 530 + idx * 50;
-ctx.beginPath();
-ctx.arc(115, y - 9, 14, 0, Math.PI * 2);
-ctx.fillStyle = dotColors[it.status] || '#888';
-ctx.fill();
-ctx.fillStyle = '#222222';
-ctx.font = '26px sans-serif';
-ctx.textAlign = 'left';
-ctx.fillText(formatDateBR(it.date), 165, y);
-ctx.textAlign = 'right';
-ctx.fillText(it.amount > 0 ? R$ ${it.amount} : '0', 610, y);
-});
-// Share PNG via Web Share API (opens WhatsApp directly on mobile)
-canvas.toBlob(async (blob) => {
-const file = new File([blob], fechamento-${group.name}.png, { type: 'image/png' });
-const textSummary = Olá ${group.name}, segue o fechamento: Valor total R$ ${group.total}. ${state.settings.fechamento_msg};
-if (navigator.canShare && navigator.canShare({ files: [file] })) {
-await navigator.share({ files: [file], text: textSummary });
-} else {
-const cleanPhone = (group.phone || '').replace(/\D/g, '');
-const waUrl = https://wa.me{cleanPhone ? '55' + cleanPhone : ''}?text=${encodeURIComponent(textSummary)};
-window.open(waUrl, '_blank');
+  const canvas = document.getElementById('receipt-canvas');
+  const ctx = canvas.getContext('2d');
+  const h = Math.max(760, 560 + group.items.length * 52);
+  canvas.height = h;
+
+  // White background
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, 720, h);
+
+  // Top Trainer Header Banner (Matching Screenshot)
+  ctx.fillStyle = '#7c6265';
+  ctx.fillRect(0, 0, 720, 175);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 38px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(state.settings.trainer_name, 360, 88);
+  ctx.font = '18px sans-serif';
+  ctx.fillStyle = '#f0e6e7';
+  ctx.fillText(state.settings.trainer_subtitle, 360, 125);
+
+  // Period text
+  const firstDate = group.items[0] ? formatDateBR(group.items[0].date) : '';
+  const lastDate = group.items[group.items.length - 1] ? formatDateBR(group.items[group.items.length - 1].date) : '';
+  ctx.fillStyle = '#222222';
+  ctx.font = '28px sans-serif';
+  ctx.fillText(`Olá ${group.name}, segue resumo das`, 360, 245);
+  ctx.fillText(`aulas entre ${firstDate} e ${lastDate}.`, 360, 282);
+
+  // Total Badge
+  ctx.fillStyle = '#7c6265';
+  ctx.fillRect(145, 315, 430, 64);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 30px sans-serif';
+  ctx.fillText(`Valor total: R$ ${group.total}`, 360, 357);
+
+  // Custom Closing Message from Ajustes
+  ctx.fillStyle = '#222222';
+  ctx.font = '25px sans-serif';
+  const msgLines = state.settings.fechamento_msg.split('\n');
+  msgLines.forEach((line, i) => ctx.fillText(line, 360, 430 + i * 34));
+
+  // Itemized Rows
+  const dotColors = {
+    attended: '#28a745',
+    unexcused: '#dc3545',
+    excused: '#007bff',
+    avulsa: '#8e44ad'
+  };
+
+  group.items.forEach((it, idx) => {
+    const y = 530 + idx * 50;
+    ctx.beginPath();
+    ctx.arc(115, y - 9, 14, 0, Math.PI * 2);
+    ctx.fillStyle = dotColors[it.status] || '#888';
+    ctx.fill();
+    ctx.fillStyle = '#222222';
+    ctx.font = '26px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(formatDateBR(it.date), 165, y);
+    ctx.textAlign = 'right';
+    ctx.fillText(it.amount > 0 ? `R$ ${it.amount}` : '0', 610, y);
+  });
+
+  // Share PNG via Web Share API (opens WhatsApp directly on mobile)
+  canvas.toBlob(async (blob) => {
+    const file = new File([blob], `fechamento-${group.name}.png`, { type: 'image/png' });
+    const textSummary = `Olá ${group.name}, segue o fechamento: Valor total R$ ${group.total}. ${state.settings.fechamento_msg}`;
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], text: textSummary });
+    } else {
+      const cleanPhone = (group.phone || '').replace(/\D/g, '');
+      const waUrl = `https://wa.me{cleanPhone ? '55' + cleanPhone : ''}?text=${encodeURIComponent(textSummary)}`;
+      window.open(waUrl, '_blank');
+    }
+  }, 'image/png');
 }
-}, 'image/png');
-}
+
 // ============================================================================
 // 9. AJUSTES (SETTINGS)
 // ============================================================================
 function syncAjustesUI() {
-document.getElementById('set-default-rate').value = state.settings.default_price;
-document.getElementById('set-duration-btn').textContent = state.settings.class_duration;
-document.getElementById('set-weekends').checked = state.settings.show_weekends;
-document.getElementById('set-trainer-name').value = state.settings.trainer_name;
+  document.getElementById('set-default-rate').value = state.settings.default_price;
+  document.getElementById('set-duration-btn').textContent = state.settings.class_duration;
+  document.getElementById('set-weekends').checked = state.settings.show_weekends;
+  document.getElementById('set-trainer-name').value = state.settings.trainer_name;
 }
+
 async function saveSettings(partial) {
-state.settings = { ...state.settings, ...partial };
-await sb.from('trainer_settings').upsert({ id: 1, ...state.settings });
+  state.settings = { ...state.settings, ...partial };
+  await sb.from('trainer_settings').upsert({ id: 1, ...state.settings });
 }
+
 function setupAjustesControls() {
-document.getElementById('set-default-rate').addEventListener('change', (e) => {
-saveSettings({ default_price: Number(e.target.value) });
-});
-document.getElementById('set-duration-btn').addEventListener('click', (e) => {
-const next = state.settings.class_duration === 60 ? 45 : 60;
-e.target.textContent = next;
-saveSettings({ class_duration: next });
-});
-document.getElementById('set-weekends').addEventListener('change', (e) => {
-saveSettings({ show_weekends: e.target.checked });
-renderCalendar();
-renderClientesList();
-});
-document.getElementById('set-trainer-name').addEventListener('change', (e) => {
-saveSettings({ trainer_name: e.target.value.trim() });
-});
-// Message Editors
-const modal = document.getElementById('msg-modal');
-const textarea = document.getElementById('msg-modal-textarea');
-document.getElementById('btn-edit-msg-fechamento').addEventListener('click', () => {
-state.activeMsgKey = 'fechamento_msg';
-document.getElementById('msg-modal-title').textContent = 'Texto Fechamento';
-textarea.value = state.settings.fechamento_msg;
-modal.classList.remove('hidden');
-});
-document.getElementById('btn-edit-msg-aniversario').addEventListener('click', () => {
-state.activeMsgKey = 'birthday_msg';
-document.getElementById('msg-modal-title').textContent = 'Texto Aniversários';
-textarea.value = state.settings.birthday_msg;
-modal.classList.remove('hidden');
-});
-document.getElementById('btn-close-msg-modal').addEventListener('click', () => modal.classList.add('hidden'));
-document.getElementById('btn-save-msg-modal').addEventListener('click', () => {
-if (state.activeMsgKey) saveSettings({ [state.activeMsgKey]: textarea.value });
-modal.classList.add('hidden');
-});
+  document.getElementById('set-default-rate').addEventListener('change', (e) => {
+    saveSettings({ default_price: Number(e.target.value) });
+  });
+
+  document.getElementById('set-duration-btn').addEventListener('click', (e) => {
+    const next = state.settings.class_duration === 60 ? 45 : 60;
+    e.target.textContent = next;
+    saveSettings({ class_duration: next });
+  });
+
+  document.getElementById('set-weekends').addEventListener('change', (e) => {
+    saveSettings({ show_weekends: e.target.checked });
+    renderCalendar();
+    renderClientesList();
+  });
+
+  document.getElementById('set-trainer-name').addEventListener('change', (e) => {
+    saveSettings({ trainer_name: e.target.value.trim() });
+  });
+
+  // Message Editors
+  const modal = document.getElementById('msg-modal');
+  const textarea = document.getElementById('msg-modal-textarea');
+
+  document.getElementById('btn-edit-msg-fechamento').addEventListener('click', () => {
+    state.activeMsgKey = 'fechamento_msg';
+    document.getElementById('msg-modal-title').textContent = 'Texto Fechamento';
+    textarea.value = state.settings.fechamento_msg;
+    modal.classList.remove('hidden');
+  });
+
+  document.getElementById('btn-edit-msg-aniversario').addEventListener('click', () => {
+    state.activeMsgKey = 'birthday_msg';
+    document.getElementById('msg-modal-title').textContent = 'Texto Aniversários';
+    textarea.value = state.settings.birthday_msg;
+    modal.classList.remove('hidden');
+  });
+
+  document.getElementById('btn-close-msg-modal').addEventListener('click', () => modal.classList.add('hidden'));
+
+  document.getElementById('btn-save-msg-modal').addEventListener('click', () => {
+    if (state.activeMsgKey) saveSettings({ [state.activeMsgKey]: textarea.value });
+    modal.classList.add('hidden');
+  });
 }
+
 // Start App
 initApp();
