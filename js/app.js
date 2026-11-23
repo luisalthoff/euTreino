@@ -264,21 +264,23 @@ function renderAgendaTimeline() {
     row.innerHTML = `<div class="hour-label">${hourLabel}</div><div class="hour-slot"></div>`;
     const slotEl = row.querySelector('.hour-slot');
 
-    slotSessions.forEach(sess => {
-      const item = document.createElement('div');
-      item.className = 'session-item';
-      const pillStyle = is45Min
-        ? `background:${sess.color}; width:75%;`
-        : `background:${sess.color}; width:100%;`;
+    slotSessions.forEach((sess) => {
+      const item = document.createElement("div");
+      item.className = "session-item";
 
-      item.innerHTML = `<div class="session-pill" style="${pillStyle}"><span>${sess.name} ${sess.time.endsWith(':00') ? '' : `<small>(${sess.time})</small>`}</span><button type="button" class="status-dot-btn status-${sess.status}" title="Alterar status"></button></div>`;
-      const dotBtn = item.querySelector('.status-dot-btn');
-      dotBtn.addEventListener('click', (e) => {
+      // Vertical duration: 45 min = 3/4 of the 54px 1-hour slot (38px), 60 min = full slot
+      const pillStyle = is45Min
+        ? `background:${sess.color}; display:inline-flex; align-items:center; gap:12px; height:36px; padding:4px 14px;`
+        : `background:${sess.color}; display:inline-flex; align-items:center; gap:12px; min-height:46px; padding:10px 18px;`;
+
+      item.innerHTML = `<div class="session-pill" style="${pillStyle}"><span>${sess.name} ${sess.time.endsWith(":00") ? "" : `<small>(${sess.time})</small>`}</span><button type="button" class="status-dot-btn dot-${sess.status}" title="Alterar status"></button></div>`;
+      const dotBtn = item.querySelector(".status-dot-btn");
+      dotBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         toggleSessionStatus(sess, isoDate);
       });
       slotEl.appendChild(item);
-    });
+    };);
     timeline.appendChild(row);
   }
 }
