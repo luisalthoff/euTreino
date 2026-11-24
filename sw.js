@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'euTreino-';
-const CACHE_NAME = 'euTreino-v1.4';
+const CACHE_NAME = 'euTreino-v1.5';
 const ASSETS = [
   './',
   './index.html',
