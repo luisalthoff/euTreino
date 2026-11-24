@@ -895,6 +895,7 @@ function renderFechamento() {
 
   listEl.innerHTML = summaryHtml + groupsHtml;
 
+    // Replace the bottom click listeners inside renderFechamento() with:
   listEl.querySelectorAll('.pay-badge').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -904,14 +905,21 @@ function renderFechamento() {
   });
 
   listEl.querySelectorAll('.fechamento-bar').forEach(bar => {
-    bar.addEventListener('click', () => {
-      document.getElementById(`f-det-${bar.dataset.idx}`).classList.toggle('open');
+    bar.addEventListener('click', (e) => {
+      if (e.target.closest('.pay-badge')) return;
+      const det = document.getElementById(`f-det-${bar.dataset.idx}`);
+      if (det) det.classList.toggle('open');
     });
   });
 
   listEl.querySelectorAll('.share-whatsapp-btn').forEach(btn => {
-    btn.addEventListener('click', () => shareReceiptViaWhatsApp(groups[btn.dataset.idx]));
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      shareReceiptViaWhatsApp(groups[Number(btn.dataset.idx)]);
+    });
   });
+
+
 }
 
 
