@@ -106,7 +106,7 @@ function syncFechamentoDefaults()
   document.getElementById('fechamento-start-date').value = formatDateISO(now);
   document.getElementById('fechamento-end-date').value = formatDateISO(lastDay);
 
-  const years =;
+  const years = Array.from({ length: 7 }, (_, i) => 2024 + i);
   setWheelValue(document.getElementById('fechamento-month-col'), MONTH_SHORT, MONTH_SHORT[curMonth]);
   setWheelValue(document.getElementById('fechamento-year-col'), years, curYear);
 }
@@ -616,7 +616,7 @@ function setupFechamentoControls()
 {
   const monthCol = document.getElementById('fechamento-month-col');
   const yearCol = document.getElementById('fechamento-year-col');
-  const years =;
+  const years = Array.from({ length: 7 }, (_, i) => 2024 + i);
 
   buildWheel(monthCol, MONTH_SHORT);
   buildWheel(yearCol, years);
@@ -653,11 +653,6 @@ function setupFechamentoControls()
       });
     });
   });
-
-  document.getElementById('fechamento-start-date').addEventListener('change', renderFechamento);
-  document.getElementById('fechamento-end-date').addEventListener('change', renderFechamento);
-}
-
 
   document.getElementById('fechamento-start-date').addEventListener('change', renderFechamento);
   document.getElementById('fechamento-end-date').addEventListener('change', renderFechamento);
