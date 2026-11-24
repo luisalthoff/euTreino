@@ -23,28 +23,26 @@
     <!-- ==================== VIEW 1: AGENDA ==================== -->
     <div id="view-agenda" class="view active">
       <header class="top-bar">
-        <button id="btn-open-avulsa" class="icon-btn" title="Aula Avulsa">
+        <button type="button" id="btn-open-avulsa" class="icon-btn" title="Aula Avulsa">
           <img src="img/avulso.png" alt="Aula Avulsa" class="header-icon">
         </button>
-        <h1>Agenda 24@00:45</h1>
-        <div class="header-actions">
-          <button id="btn-help" class="icon-btn" title="Legenda">?</button>
-          <button id="btn-today" class="icon-btn" title="Ir para Hoje">🕒</button>
+        <h1>Agenda</h1>
+        <div class="top-bar-right">
+          <button type="button" id="btn-help" class="icon-btn" title="Ajuda">?</button>
+          <button type="button" id="btn-toggle-calendar" class="icon-btn" title="Alternar Calendário">
+            <img src="img/day.png" alt="Alternar visualização" class="header-icon">
+          </button>
         </div>
       </header>
 
       <div class="main-content">
         <div class="calendar-controls">
-          <button id="month-label" class="month-picker">November 2026 &gt;</button>
+          <button type="button" id="btn-today" class="month-picker"><span id="month-label">November 2026 &gt;</span></button>
           <div class="nav-arrows">
-            <button type="button" id="btn-toggle-calendar" class="toggle-cal-btn" title="Alternar Calendário">
-              <img src="img/day.png" alt="Alternar visualização" class="cal-toggle-icon">
-            </button>
-            <button id="btn-prev-month">&lt;</button>
-            <button id="btn-next-month">&gt;</button>
+            <button type="button" id="btn-prev-month">&lt;</button>
+            <button type="button" id="btn-next-month">&gt;</button>
           </div>
         </div>
-
         <section id="calendar-wrapper" class="calendar-wrapper">
           <div id="calendar-weekdays" class="weekdays"></div>
           <div id="calendar-grid" class="calendar-grid"></div>
@@ -59,7 +57,7 @@
       <header class="top-bar">
         <button id="btn-cancel-avulsa" class="text-btn">Cancelar</button>
         <span></span>
-        <button id="btn-save-avulsa" class="text-btn bold">Salvar</button>
+        <button id="btn-save-avulsa" class="text-btn">Salvar</button>
       </header>
 
       <div class="avulsa-banner">
@@ -110,16 +108,12 @@
     </div>
 
     <!-- ==================== VIEW 4: INFO (ADD/EDIT CLIENT) ==================== -->
-    <div id="view-info" class="view modal-view">
+    <div id="view-info" class="view modal-view">      
       <header class="top-bar">
-        <button id="btn-back-info" class="icon-btn">&lt;</button>
+        <button type="button" id="btn-back-info" class="icon-btn">&lt;</button>
         <h1>Info</h1>
-        <div class="header-actions">
-          <button id="btn-delete-client" class="icon-btn hidden" title="Excluir">🗑️</button>
-          <button id="btn-save-client" class="text-btn bold">Salvar</button>
-        </div>
+        <span style="width: 28px;"></span>
       </header>
-
       <div class="main-content scroll-pad">
         <div class="info-avatar-row">
           <div id="info-avatar-preview" class="avatar-circle large">👤</div>

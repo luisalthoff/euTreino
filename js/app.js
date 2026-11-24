@@ -206,8 +206,8 @@ function renderCalendar() {
   gridEl.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
 
   const headers = showWknd
-    ? ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
-    : ['MON', 'TUE', 'WED', 'THU', 'FRI'];
+    ? ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB', 'DOM']
+    : ['SEG', 'TER', 'QUA', 'QUI', 'SEX']
   weekdaysEl.innerHTML = headers.map(h => `<span>${h}</span>`).join('');
 
   const monthName = new Date(state.viewYear, state.viewMonth).toLocaleString('en-US', { month: 'long' });
@@ -468,15 +468,105 @@ function renderClientesList() {
 
   container.innerHTML = state.clients.map(client => {
     const colsHtml = days.map(d => `<div> ${d} <span>${client.weekly_schedule?.[d] || ''}</span> </div>`).join('');
-    return `<div class="client-card-wrap" data-id="${client.id}"> <div class="client-card" style="background:${client.card_color}"> <div class="card-top-badge" style="background:${client.card_color}"></div> <div class="card-main-row"> <h3>${client.name}</h3> <div class="avatar-circle">👤</div> </div> <div class="card-days-row">${colsHtml}</div> </div> <span class="card-outer-chevron">&gt;</span> </div>`;
+    return `<div class="client-swipe-container" data-id="${client.id}">
+      <button type="button" class="client-delete-action" data-id="${client.id}">Delete</button>
+      <div class="client-card-wrap" data-id="${client.id}">
+        <div class="client-card" style="background:${client.card_color}">
+          <div class="card-top-badge" style="background:${client.card_color}"></div>
+          <div class="card-main-row">
+            <h3>${client.name}</h3>
+            <div class="avatar-circle">👤</div>
+          </div>
+          <div class="card-days-row">${colsHtml}</div>
+        </div>
+        <span class="card-outer-chevron">&gt;</span>
+      </div>
+    </div>`;
   }).join('');
 
+  let openCard = null;
+
   container.querySelectorAll('.client-card-wrap').forEach(card => {
-    card.addEventListener('click', () => openInfoScreen(card.dataset.id));
+    let startX = 0;
+    let startY = 0;
+    let currentOffset = 0;
+    let isSwiping = false;
+
+    card.addEventListener('touchstart', (e) => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      isSwiping = false;
+      card.style.transition = 'none';
+
+      // Close any other open card
+      if (openCard && openCard !== card) {
+        openCard.style.transition = 'transform 0.22s ease';
+        openCard.style.transform = 'translateX(0px)';
+        openCard.dataset.open = 'false';
+        openCard = null;
+      }
+    }, { passive: true });
+
+    card.addEventListener('touchmove', (e) => {
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+
+      // Only trigger horizontal swipe if horizontal movement dominates vertical scroll
+      if (!isSwiping && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+        isSwiping = true;
+      }
+      if (!isSwiping) return;
+
+      const base = card.dataset.open === 'true' ? -88 : 0;
+      currentOffset = Math.max(-96, Math.min(0, base + dx));
+      card.style.transform = `translateX(${currentOffset}px)`;
+    }, { passive: true });
+
+    card.addEventListener('touchend', () => {
+      card.style.transition = 'transform 0.22s ease';
+      if (isSwiping) {
+        if (currentOffset < -44) {
+          card.style.transform = 'translateX(-88px)';
+          card.dataset.open = 'true';
+          openCard = card;
+        } else {
+          card.style.transform = 'translateX(0px)';
+          card.dataset.open = 'false';
+          if (openCard === card) openCard = null;
+        }
+      }
+    });
+
+    card.addEventListener('click', () => {
+      if (isSwiping) {
+        isSwiping = false;
+        return;
+      }
+      // If swiped open, tapping the card slides it closed first
+      if (card.dataset.open === 'true') {
+        card.style.transform = 'translateX(0px)';
+        card.dataset.open = 'false';
+        openCard = null;
+        return;
+      }
+      openInfoScreen(card.dataset.id);
+    });
+  });
+
+  container.querySelectorAll('.client-delete-action').forEach(delBtn => {
+    delBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = delBtn.dataset.id;
+      await sb.from('clients').delete().eq('id', id);
+      state.clients = state.clients.filter(c => c.id !== id);
+      renderAll();
+    });
   });
 }
 
-function openInfoScreen(clientId = null) {
+
+function openInfoScreen(clientId = null)
+{
   state.editingClientId = clientId;
   const client = clientId ? state.clients.find(c => c.id === clientId) : null;
 
@@ -484,8 +574,6 @@ function openInfoScreen(clientId = null) {
   document.getElementById('info-phone').value = client ? (client.phone || '') : '';
   document.getElementById('info-rate').value = client ? client.hourly_rate : state.settings.default_price;
   state.selectedColor = client ? client.card_color : '#00B2E3';
-
-  document.getElementById('btn-delete-client').classList.toggle('hidden', !client);
 
   // Sync color swatches
   document.querySelectorAll('.swatch').forEach(sw => {
@@ -515,9 +603,9 @@ function openInfoScreen(clientId = null) {
   showView('view-info');
 }
 
-function setupClientInfoControls() {
+function setupClientInfoControls()
+{
   document.getElementById('btn-add-client').addEventListener('click', () => openInfoScreen(null));
-  document.getElementById('btn-back-info').addEventListener('click', () => showView('view-clientes'));
 
   document.querySelectorAll('.swatch').forEach(sw => {
     sw.addEventListener('click', () => {
@@ -527,9 +615,18 @@ function setupClientInfoControls() {
     });
   });
 
-  document.getElementById('btn-save-client').addEventListener('click', async () => {
+  // Auto-save when '<' is tapped if name is present; discard all changes if name is empty
+  document.getElementById('btn-back-info').addEventListener('click', async () => {
     const name = document.getElementById('info-name').value.trim();
-    if (!name) return alert('Por favor, informe o nome do aluno.');
+
+    if (!name) {
+      // Clear inputs and return without saving or modifying existing client
+      document.getElementById('info-name').value = '';
+      document.getElementById('info-phone').value = '';
+      state.editingClientId = null;
+      showView('view-clientes');
+      return;
+    }
 
     const weekly_schedule = {};
     document.querySelectorAll('.schedule-day-row').forEach(row => {
@@ -557,14 +654,7 @@ function setupClientInfoControls() {
       state.clients.push(data || { id: crypto.randomUUID(), ...payload });
     }
 
-    showView('view-clientes');
-    renderAll();
-  });
-
-  document.getElementById('btn-delete-client').addEventListener('click', async () => {
-    if (!state.editingClientId || !confirm('Excluir este aluno?')) return;
-    await sb.from('clients').delete().eq('id', state.editingClientId);
-    state.clients = state.clients.filter(c => c.id !== state.editingClientId);
+    state.editingClientId = null;
     showView('view-clientes');
     renderAll();
   });
