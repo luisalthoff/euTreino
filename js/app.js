@@ -93,17 +93,43 @@ function showView(viewId) {
   document.getElementById('bottom-nav').style.display = isModal ? 'none' : 'flex';
 }
 
-function setupNavigation() {
-  document.querySelectorAll('.nav-item').forEach(btn => {
-    btn.addEventListener('click', () => {
+function syncFechamentoDefaults()
+{
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth();
+  const lastDay = new Date(curYear, curMonth + 1, 0);
+
+  state.fechamentoYear = curYear;
+  state.fechamentoMonth = curMonth;
+
+  document.getElementById('fechamento-start-date').value = formatDateISO(now);
+  document.getElementById('fechamento-end-date').value = formatDateISO(lastDay);
+
+  const years =;
+  setWheelValue(document.getElementById('fechamento-month-col'), MONTH_SHORT, MONTH_SHORT[curMonth]);
+  setWheelValue(document.getElementById('fechamento-year-col'), years, curYear);
+}
+
+function setupNavigation()
+{
+  document.querySelectorAll('.nav-item').forEach(btn =>
+  {
+    btn.addEventListener('click', () =>
+    {
       document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       const target = btn.dataset.target;
       showView(target);
-      if (target === 'view-fechamento') renderFechamento();
+      if (target === 'view-fechamento')
+      {
+        syncFechamentoDefaults();
+        renderFechamento();
+      }
     });
   });
 }
+
 
 function formatDateISO(date) {
   const y = date.getFullYear();
@@ -586,40 +612,52 @@ async function toggleClientPayment(clientKey, periodKey, amount) {
 }
 
 
-function setupFechamentoControls() {
+function setupFechamentoControls()
+{
   const monthCol = document.getElementById('fechamento-month-col');
   const yearCol = document.getElementById('fechamento-year-col');
-  const years = [2024, 2025, 2026, 2027, 2028, 2029, 2030];
+  const years =;
 
   buildWheel(monthCol, MONTH_SHORT);
   buildWheel(yearCol, years);
 
-  setTimeout(() => {
-    setWheelValue(monthCol, MONTH_SHORT, MONTH_SHORT[state.fechamentoMonth]);
-    setWheelValue(yearCol, years, state.fechamentoYear);
-  }, 50);
-
-  monthCol.addEventListener('scroll', () => {
+  monthCol.addEventListener('scroll', () =>
+  {
     const val = getWheelValue(monthCol, MONTH_SHORT);
     state.fechamentoMonth = MONTH_SHORT.indexOf(val);
     renderFechamento();
   });
 
-  yearCol.addEventListener('scroll', () => {
+  yearCol.addEventListener('scroll', () =>
+  {
     state.fechamentoYear = getWheelValue(yearCol, years);
     renderFechamento();
   });
 
-  document.querySelectorAll('.seg-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+  document.querySelectorAll('.seg-btn').forEach(btn =>
+  {
+    btn.addEventListener('click', () =>
+    {
       document.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       state.fechamentoMode = btn.dataset.mode;
       document.querySelectorAll('.filter-panel').forEach(p => p.classList.remove('active'));
       document.getElementById(`filter-${state.fechamentoMode}`).classList.add('active');
-      renderFechamento();
+
+      syncFechamentoDefaults();
+      requestAnimationFrame(() =>
+      {
+        setWheelValue(monthCol, MONTH_SHORT, MONTH_SHORT[state.fechamentoMonth]);
+        setWheelValue(yearCol, years, state.fechamentoYear);
+        renderFechamento();
+      });
     });
   });
+
+  document.getElementById('fechamento-start-date').addEventListener('change', renderFechamento);
+  document.getElementById('fechamento-end-date').addEventListener('change', renderFechamento);
+}
+
 
   document.getElementById('fechamento-start-date').addEventListener('change', renderFechamento);
   document.getElementById('fechamento-end-date').addEventListener('change', renderFechamento);
