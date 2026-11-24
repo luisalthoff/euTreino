@@ -123,7 +123,8 @@ function setupNavigation()
       showView(target);
       if (target === 'view-fechamento')
       {
-        syncFechamentoDefaults();
+        setWheelValue(document.getElementById('fechamento-month-col'), MONTH_SHORT, MONTH_SHORT[state.fechamentoMonth]);
+        setWheelValue(document.getElementById('fechamento-year-col'), [2024, 2025, 2026, 2027, 2028, 2029, 2030], state.fechamentoYear);
         renderFechamento();
       }
     });
@@ -566,50 +567,8 @@ function setupClientInfoControls() {
 // 8. FECHAMENTO & WHATSAPP RECEIPT IMAGE GENERATOR
 // ============================================================================
 
-//CLIENTE JÁ PAGOU OU NÃO...
-function getCurrentPeriodKey() {
-  if (state.fechamentoMode === 'mes') {
-    return `${state.fechamentoYear}-${String(state.fechamentoMonth + 1).padStart(2, '0')}`;
-  }
-  if (state.fechamentoMode === 'ano') {
-    return `${state.fechamentoYear}`;
-  }
-  const start = document.getElementById('fechamento-start-date').value || 'start';
-  const end = document.getElementById('fechamento-end-date').value || 'end';
-  return `range_${start}_${end}`;
-}
 
-async function toggleClientPayment(clientKey, periodKey, amount) {
-  const existingIdx = state.payments.findIndex(
-    p => p.client_key === clientKey && p.period_key === periodKey
-  );
-  const currentPaid = existingIdx >= 0 ? Boolean(state.payments[existingIdx].paid) : false;
-  const nextPaid = !currentPaid;
 
-  const record = {
-    client_key: clientKey,
-    period_key: periodKey,
-    amount: amount,
-    paid: nextPaid,
-    paid_at: nextPaid ? new Date().toISOString() : null
-  };
-
-  if (existingIdx >= 0) {
-    state.payments[existingIdx] = { ...state.payments[existingIdx], ...record };
-  } else {
-    state.payments.push(record);
-  }
-
-  renderFechamento();
-
-  const { error } = await sb
-    .from('payments')
-    .upsert(record, { onConflict: 'client_key,period_key' });
-
-  if (error) {
-    console.error('Erro ao salvar pagamento no Supabase:', error.message);
-  }
-}
 
 
 function setupFechamentoControls()
@@ -674,11 +633,42 @@ function matchesFilterDate(dateStr)
   return true;
 }
 
-function renderFechamento()
-{
+async function toggleClientMonthPayments(clientKey, monthItemsMap, markPaid) {
+  const entries = Object.entries(monthItemsMap); // [ ['2026-11', 150], ... ]
+
+  for (const [periodKey, amount] of entries) {
+    const existingIdx = state.payments.findIndex(
+      p => p.client_key === clientKey && p.period_key === periodKey
+    );
+    const record = {
+      client_key: clientKey,
+      period_key: periodKey,
+      amount: amount,
+      paid: markPaid,
+      paid_at: markPaid ? new Date().toISOString() : null
+    };
+
+    if (existingIdx >= 0) {
+      state.payments[existingIdx] = { ...state.payments[existingIdx], ...record };
+    } else {
+      state.payments.push(record);
+    }
+
+    const { error } = await sb
+      .from('payments')
+      .upsert(record, { onConflict: 'client_key,period_key' });
+
+    if (error) {
+      console.error('Erro ao salvar pagamento no Supabase:', error.message);
+    }
+  }
+
+  renderFechamento();
+}
+
+function renderFechamento() {
   const listEl = document.getElementById('fechamento-list');
   const grouped = {};
-  const periodKey = getCurrentPeriodKey();
 
   // 1. Collect recurring logs (exclude 'pending')
   state.attendanceLogs
@@ -688,10 +678,12 @@ function renderFechamento()
       if (!client) return;
       const key = String(client.id);
       if (!grouped[key]) {
-        grouped[key] = { key, name: client.name, phone: client.phone, color: client.card_color, total: 0, items: [] };
+        grouped[key] = { key, name: client.name, phone: client.phone, color: client.card_color, total: 0, items: [], monthTotals: {} };
       }
       const amt = (l.status === 'attended' || l.status === 'unexcused') ? Number(l.price) : 0;
+      const ym = l.session_date.slice(0, 7); // 'YYYY-MM'
       grouped[key].total += amt;
+      grouped[key].monthTotals[ym] = (grouped[key].monthTotals[ym] || 0) + amt;
       grouped[key].items.push({ date: l.session_date, status: l.status, amount: amt });
     });
 
@@ -708,11 +700,14 @@ function renderFechamento()
           phone: client?.phone || '',
           color: client ? client.card_color : '#00B2E3',
           total: 0,
-          items: []
+          items: [],
+          monthTotals: {}
         };
       }
       const amt = Number(sc.price);
+      const ym = sc.session_date.slice(0, 7); // 'YYYY-MM'
       grouped[key].total += amt;
+      grouped[key].monthTotals[ym] = (grouped[key].monthTotals[ym] || 0) + amt;
       grouped[key].items.push({ date: sc.session_date, status: 'avulsa', amount: amt });
     });
 
@@ -726,13 +721,28 @@ function renderFechamento()
   let totalAReceber = 0;
 
   groups.forEach(g => {
-    const payRec = state.payments.find(p => p.client_key === g.key && p.period_key === periodKey);
-    g.isPaid = payRec ? Boolean(payRec.paid) : false;
-    if (g.isPaid) {
-      totalRecebido += g.total;
-    } else {
-      totalAReceber += g.total;
-    }
+    const monthsInGroup = Object.keys(g.monthTotals);
+    let clientPaid = 0;
+    let clientUnpaid = 0;
+
+    monthsInGroup.forEach(ym => {
+      const payRec = state.payments.find(p => p.client_key === g.key && p.period_key === ym);
+      const isMonthPaid = payRec ? Boolean(payRec.paid) : false;
+      if (isMonthPaid) {
+        clientPaid += g.monthTotals[ym];
+      } else {
+        clientUnpaid += g.monthTotals[ym];
+      }
+    });
+
+    // Paid only if every active month in the filtered view is marked paid
+    g.isPaid = monthsInGroup.length > 0 && monthsInGroup.every(ym => {
+      const payRec = state.payments.find(p => p.client_key === g.key && p.period_key === ym);
+      return payRec ? Boolean(payRec.paid) : false;
+    });
+
+    totalRecebido += clientPaid;
+    totalAReceber += clientUnpaid;
   });
 
   const summaryHtml = `
@@ -758,7 +768,7 @@ function renderFechamento()
       <div class="fechamento-bar" style="background:${g.color}" data-idx="${idx}">
         <span class="bar-main-text">R$ ${g.total} &nbsp;&nbsp; ${g.name}</span>
         <div class="bar-right-actions">
-          <button type="button" class="${badgeClass}" data-key="${g.key}" data-amount="${g.total}" title="Marcar como pago/pendente">${badgeLabel}</button>
+          <button type="button" class="${badgeClass}" data-idx="${idx}" title="Marcar como pago/pendente">${badgeLabel}</button>
           <span>&gt;</span>
         </div>
       </div>
@@ -774,7 +784,8 @@ function renderFechamento()
   listEl.querySelectorAll('.pay-badge').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      toggleClientPayment(btn.dataset.key, periodKey, Number(btn.dataset.amount));
+      const grp = groups[Number(btn.dataset.idx)];
+      toggleClientMonthPayments(grp.key, grp.monthTotals, !grp.isPaid);
     });
   });
 
@@ -788,6 +799,8 @@ function renderFechamento()
     btn.addEventListener('click', () => shareReceiptViaWhatsApp(groups[btn.dataset.idx]));
   });
 }
+
+
 
 async function shareReceiptViaWhatsApp(group) {
   const canvas = document.getElementById('receipt-canvas');
