@@ -20,7 +20,7 @@
 
 body, html {
   height: 100%;
-  background: #ececec;
+  background: var(--orange);
   color: var(--text);
   overflow: hidden;
 }
