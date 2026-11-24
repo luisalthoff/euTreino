@@ -2,11 +2,11 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#ff7a00" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="euTreino">
 
   <title>euTreino</title>
@@ -116,18 +116,13 @@
       </header>
       <div class="main-content scroll-pad">
         <div class="info-avatar-row">
-          <div id="info-avatar-preview" class="avatar-circle large">👤</div>
-          <div class="color-swatches" id="color-swatches">
-            <button type="button" class="swatch active" data-color="#00B2E3" style="background:#00B2E3"></button>
-            <button type="button" class="swatch" data-color="#FFE066" style="background:#FFE066"></button>
-            <button type="button" class="swatch" data-color="#34C759" style="background:#34C759"></button>
-            <button type="button" class="swatch" data-color="#FF9F43" style="background:#FF9F43"></button>
-            <button type="button" class="swatch" data-color="#A55EEA" style="background:#A55EEA"></button>
-          </div>
+          <div class="avatar-circle large">👤</div>
+          <label class="color-picker-btn" id="info-color-btn" title="Escolher cor do aluno">
+            <input type="color" id="info-color-input" value="#00B2E3" />
+            <span class="color-wheel-ring"></span>
+          </label>
         </div>
-
         <input type="text" id="info-name" class="form-input" placeholder="Nome" />
-
         <div class="form-row-split">
           <span class="prefix">+55</span>
           <input type="tel" id="info-phone" placeholder="Fone (ex: 47999999999)" />

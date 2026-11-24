@@ -147,6 +147,21 @@ function formatDateBR(dateStr) {
   return `${d}/${m}`;
 }
 
+function getContrastColor(hex) {
+  if (!hex || !hex.startsWith('#')) return '#111111';
+  const clean = hex.replace('#', '');
+  const fullHex = clean.length === 3
+    ? clean.split('').map(c => c + c).join('')
+    : clean;
+  const r = parseInt(fullHex.substring(0, 2), 16);
+  const g = parseInt(fullHex.substring(2, 4), 16);
+  const b = parseInt(fullHex.substring(4, 6), 16);
+  // Standard YIQ perceptual brightness formula
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq >= 145 ? '#111111' : '#ffffff';
+}
+
+
 function populatePriceSelects() {
   const options = [];
   for (let p = 50; p <= 400; p += 10) {
@@ -246,7 +261,8 @@ function renderCalendar() {
   }
 }
 
-function renderAgendaTimeline() {
+function renderAgendaTimeline()
+{
   const timeline = document.getElementById('agenda-timeline');
   timeline.innerHTML = '';
 
@@ -257,12 +273,12 @@ function renderAgendaTimeline() {
   // Gather recurring clients for this weekday + single classes for this exact date
   const sessions = [];
 
-  state.clients.forEach(client => {
+  state.clients.forEach(client =>
+  {
     const schedTime = client.weekly_schedule?.[weekdayKey];
-    if (schedTime) {
-      const existingLog = state.attendanceLogs.find(
-        l => l.client_id === client.id && l.session_date === isoDate
-      );
+    if (schedTime)
+    {
+      const existingLog = state.attendanceLogs.find(l => l.client_id === client.id && l.session_date === isoDate);
       sessions.push({
         type: 'recurring',
         clientId: client.id,
@@ -306,7 +322,11 @@ function renderAgendaTimeline() {
       item.className = "session-item";
 
       // Vertical duration: 45 min = 3/4 of the 54px 1-hour slot (38px), 60 min = full slot
-      const pillStyle = is45Min ? `background:${sess.color}; display:inline-flex; align-items:center; gap:12px; height:36px; padding:4px 14px;` : `background:${sess.color}; display:inline-flex; align-items:center; gap:12px; min-height:46px; padding:10px 18px;`;
+      const textColor = getContrastColor(sess.color);
+      const pillStyle = is45Min
+        ? `background:${sess.color}; color:${textColor}; height:36px; padding:4px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px;`
+        : `background:${sess.color}; color:${textColor}; min-height:46px; display:flex; align-items:center; justify-content:space-between; gap:10px;`;
+
       item.innerHTML = `<div class="session-pill" style="${pillStyle}"><span>${sess.name} ${sess.time.endsWith(":00") ? '' : `<small>(${sess.time})</small>`}</span><button type="button" class="status-dot-btn dot-${sess.status}" title="Alterar status"></button></div>`;
       const dotBtn = item.querySelector(".status-dot-btn");
       
@@ -468,10 +488,11 @@ function renderClientesList() {
 
   container.innerHTML = state.clients.map(client => {
     const colsHtml = days.map(d => `<div> ${d} <span>${client.weekly_schedule?.[d] || ''}</span> </div>`).join('');
+    const textColor = getContrastColor(client.card_color);
     return `<div class="client-swipe-container" data-id="${client.id}">
       <button type="button" class="client-delete-action" data-id="${client.id}">Delete</button>
       <div class="client-card-wrap" data-id="${client.id}">
-        <div class="client-card" style="background:${client.card_color}">
+        <div class="client-card" style="background:${client.card_color}; color:${textColor};">
           <div class="card-top-badge" style="background:${client.card_color}"></div>
           <div class="card-main-row">
             <h3>${client.name}</h3>
@@ -576,9 +597,10 @@ function openInfoScreen(clientId = null)
   state.selectedColor = client ? client.card_color : '#00B2E3';
 
   // Sync color swatches
-  document.querySelectorAll('.swatch').forEach(sw => {
-    sw.classList.toggle('active', sw.dataset.color === state.selectedColor);
-  });
+  const colorInput = document.getElementById('info-color-input');
+  const colorBtn = document.getElementById('info-color-btn');
+  colorInput.value = state.selectedColor;
+  colorBtn.style.background = state.selectedColor;
 
   // Render weekday toggles + time inputs
   const days = state.settings.show_weekends
@@ -607,12 +629,11 @@ function setupClientInfoControls()
 {
   document.getElementById('btn-add-client').addEventListener('click', () => openInfoScreen(null));
 
-  document.querySelectorAll('.swatch').forEach(sw => {
-    sw.addEventListener('click', () => {
-      document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
-      sw.classList.add('active');
-      state.selectedColor = sw.dataset.color;
-    });
+  const colorInput = document.getElementById('info-color-input');
+  const colorBtn = document.getElementById('info-color-btn');
+  colorInput.addEventListener('input', (e) => {
+    state.selectedColor = e.target.value;
+    colorBtn.style.background = state.selectedColor;
   });
 
   // Auto-save when '<' is tapped if name is present; discard all changes if name is empty
@@ -860,18 +881,14 @@ function renderFechamento() {
     const linesHtml = g.items.map(it => `<div class="fechamento-line"> <div class="line-left"> <span class="mini-dot dot-${it.status}"></span> <span>${formatDateBR(it.date)}</span> </div> <span>${it.amount > 0 ? `R$ ${it.amount}` : '0'}</span> </div>`).join('');
     const badgeClass = g.isPaid ? 'pay-badge paid' : 'pay-badge unpaid';
     const badgeLabel = g.isPaid ? 'PAGO ✓' : 'PENDENTE';
-
+    const textColor = getContrastColor(g.color);
     return `<div class="fechamento-group ${g.isPaid ? 'is-paid' : ''}">
-      <div class="fechamento-bar" style="background:${g.color}" data-idx="${idx}">
+      <div class="fechamento-bar" style="background:${g.color}; color:${textColor};" data-idx="${idx}">
         <span class="bar-main-text">R$ ${g.total} &nbsp;&nbsp; ${g.name}</span>
         <div class="bar-right-actions">
           <button type="button" class="${badgeClass}" data-idx="${idx}" title="Marcar como pago/pendente">${badgeLabel}</button>
           <span>&gt;</span>
         </div>
-      </div>
-      <div class="fechamento-details" id="f-det-${idx}">
-        <button class="share-whatsapp-btn" data-idx="${idx}" title="Enviar via WhatsApp">📤</button>
-        ${linesHtml}
       </div>
     </div>`;
   }).join('');
