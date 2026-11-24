@@ -113,24 +113,27 @@ function syncFechamentoDefaults()
 
 function setupNavigation()
 {
-  document.querySelectorAll('.nav-item').forEach(btn =>
-  {
-    btn.addEventListener('click', () =>
-    {
-      document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.nav-item').forEach(b => {
+        b.classList.remove('active');
+        const img = b.querySelector('img');
+        if (img && b.dataset.icon) img.src = `img/${b.dataset.icon}0.png`;
+      });
+
       btn.classList.add('active');
+      const activeImg = btn.querySelector('img');
+      if (activeImg && btn.dataset.icon) activeImg.src = `img/${btn.dataset.icon}1.png`;
+
       const target = btn.dataset.target;
       showView(target);
-      if (target === 'view-fechamento')
-      {
-        setWheelValue(document.getElementById('fechamento-month-col'), MONTH_SHORT, MONTH_SHORT[state.fechamentoMonth]);
-        setWheelValue(document.getElementById('fechamento-year-col'), [2024, 2025, 2026, 2027, 2028, 2029, 2030], state.fechamentoYear);
+      if (target === 'view-fechamento') {
+        syncFechamentoDefaults();
         renderFechamento();
       }
     });
   });
 }
-
 
 function formatDateISO(date) {
   const y = date.getFullYear();
@@ -156,11 +159,15 @@ function populatePriceSelects() {
 // ============================================================================
 // 5. AGENDA & COLLAPSIBLE CALENDAR
 // ============================================================================
-function setupAgendaControls() {
+function setupAgendaControls()
+{
   document.getElementById('btn-toggle-calendar').addEventListener('click', (e) => {
     state.isCalendarCollapsed = !state.isCalendarCollapsed;
     document.getElementById('calendar-wrapper').classList.toggle('collapsed', state.isCalendarCollapsed);
-    e.target.textContent = state.isCalendarCollapsed ? '▼' : '▲';
+    const img = e.currentTarget.querySelector('img');
+    if (img) {
+      img.src = state.isCalendarCollapsed ? 'img/cal.png' : 'img/day.png';
+    }
   });
 
   document.getElementById('btn-prev-month').addEventListener('click', () => {

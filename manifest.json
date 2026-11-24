@@ -1,13 +1,13 @@
 {
   "name": "euTreino",
-  "short_name": "et",
+  "short_name": "euTreino",
   "description": "Controle Mensal de Alunos",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "theme_color": "#ff7a00",
   "icons": [
     {
       "src": "img/i192.png",

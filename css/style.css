@@ -750,6 +750,26 @@ input:checked + .slider:before {
   font-weight: 600;
 }
 
+.header-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+.cal-toggle-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  border-radius: 5px;
+  vertical-align: middle;
+}
+.nav-icon-img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  margin-bottom: 2px;
+}
+
 /* Fechamento Payment Summary & Badges */
 .fechamento-summary {
   display: flex;
